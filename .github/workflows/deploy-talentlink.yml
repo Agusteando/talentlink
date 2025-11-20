@@ -1,0 +1,17 @@
+name: Deploy talentlink
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch: {}
+
+jobs:
+  deploy:
+    # This assumes you have a self-hosted Windows runner on the IIS server
+    runs-on: [self-hosted, windows]
+
+    steps:
+      - name: Run deployment script on server
+        shell: cmd
+        run: |
+          C:\Server\htdocs\talentlink\deploy-talentlink.bat
