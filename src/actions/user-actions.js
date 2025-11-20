@@ -1,31 +1,28 @@
-'use server' // <--- THIS IS MANDATORY
-import { db } from "@/lib/db"
-import { auth } from "@/auth"
-import { revalidatePath } from "next/cache"
+// --- src\actions\user-actions.js ---
+'use server';
+import { db } from "@/lib/db";
+import { auth } from "@/auth";
+import { revalidatePath } from "next/cache";
 
-export async function updateUserRole(formData) {
+export async function updateUserPermissions(userId, role, plantelId) {
     const session = await auth();
-    
-    // Security Check
     if (!session || session.user.role !== 'ADMIN') {
-        console.log("Unauthorized role update attempt");
-        return;
+        return { success: false, error: "Unauthorized" };
     }
-
-    const userId = formData.get('userId');
-    const role = formData.get('role');
-    const plantel = formData.get('plantel');
 
     try {
         await db.user.update({
             where: { id: userId },
             data: { 
-                role, 
-                plantel: role === 'DIRECTOR' ? plantel : null 
+                role: role, 
+                // Use the relational ID now
+                plantelId: role === 'DIRECTOR' ? plantelId : null 
             }
         });
         revalidatePath('/dashboard/users');
+        return { success: true };
     } catch (error) {
-        console.error("Error updating user:", error);
+        console.error("Update User Error:", error);
+        return { success: false, error: "Database error" };
     }
 }

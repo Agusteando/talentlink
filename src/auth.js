@@ -7,54 +7,49 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   ...authConfig,
   providers: [Google],
   callbacks: {
-    // 1. SignIn Logic: Create user if they don't exist
-    async signIn({ user, account, profile }) {
+    async signIn({ user }) {
       if (!user.email) return false;
       
       try {
         const existingUser = await db.user.findUnique({ where: { email: user.email } });
         
-        // Check for Super Admin environment variable
+        // Auto-detect Super Admin from Env
         const isAdminEmail = user.email === process.env.DEFAULT_ADMIN_EMAIL;
-        const roleToAssign = isAdminEmail ? "ADMIN" : "CANDIDATE";
 
         if (!existingUser) {
+          // NEW USER: Register as CANDIDATE by default
           await db.user.create({
             data: {
               email: user.email,
               name: user.name,
               image: user.image,
-              role: roleToAssign,
-              plantel: isAdminEmail ? 'ALL' : null 
+              role: isAdminEmail ? "ADMIN" : "CANDIDATE",
+              allowedPlantels: isAdminEmail ? "ALL" : null
             }
           });
         } else {
-          // Ensure Admin role is enforced if it matches the env var
+          // Existing User: Sync Admin status if needed
           if (isAdminEmail && existingUser.role !== 'ADMIN') {
              await db.user.update({
                 where: { email: user.email },
-                data: { role: 'ADMIN' }
+                data: { role: 'ADMIN', allowedPlantels: 'ALL' }
              });
           }
         }
         return true;
       } catch (error) {
-        console.error("Error in signIn callback:", error);
+        console.error("SignIn Error:", error);
         return false;
       }
     },
-    // 2. Session Logic: Attach Role and Plantel to the session object
     async session({ session }) {
       if (session.user.email) {
-        try {
-            const dbUser = await db.user.findUnique({ where: { email: session.user.email } });
-            if (dbUser) {
-                session.user.id = dbUser.id;
-                session.user.role = dbUser.role;
-                session.user.plantel = dbUser.plantel;
-            }
-        } catch (error) {
-            console.error("Error fetching user session data:", error);
+        const dbUser = await db.user.findUnique({ where: { email: session.user.email } });
+        if (dbUser) {
+            session.user.id = dbUser.id;
+            session.user.role = dbUser.role;
+            // Pass the comma-separated list to the frontend/session
+            session.user.allowedPlantels = dbUser.allowedPlantels || ""; 
         }
       }
       return session;

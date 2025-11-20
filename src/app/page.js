@@ -1,104 +1,131 @@
+// --- src\app\page.js ---
 import { db } from "@/lib/db";
 import Header from "@/components/ui/Header";
 import Link from "next/link";
-import { Search, MapPin, Briefcase, ArrowRight } from "lucide-react";
+import { Search, MapPin, Briefcase, ArrowRight, Sparkles, Building2, Calendar } from "lucide-react";
 
-// This is a Server Component by default
+export const dynamic = 'force-dynamic';
+
+function isJobNew(date) {
+    const diff = new Date() - new Date(date);
+    return diff < 3 * 24 * 60 * 60 * 1000; 
+}
+
 export default async function Home({ searchParams }) {
   const query = searchParams?.q || "";
-  const plantel = searchParams?.plantel || "";
-  const lang = searchParams?.lang || "es"; // Simple query param for lang for now
+  const plantelId = searchParams?.plantel || "";
+  const lang = searchParams?.lang || "es";
 
-  // Build the filter
+  // --- DATE FILTER LOGIC ---
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
   const whereClause = {
-    status: "OPEN", // Only show open jobs
+    status: "OPEN",
+    AND: [
+        {
+            OR: [
+                { closingDate: null },
+                { closingDate: { gte: today } }
+            ]
+        }
+    ],
     ...(query && {
-      title: { contains: query }, // Removed mode: 'insensitive' for MySQL compatibility in basic search
+      title: { contains: query },
     }),
-    ...(plantel && { plantel: plantel }),
+    ...(plantelId && { plantelId: plantelId }),
   };
 
-  const jobs = await db.job.findMany({
-    where: whereClause,
-    orderBy: { createdAt: "desc" },
-  });
+  // Fetch Jobs AND Plantels for the filter
+  const [jobs, plantels] = await Promise.all([
+    db.job.findMany({
+        where: whereClause,
+        orderBy: { createdAt: "desc" },
+        include: { plantel: true } // Important: Fetch friendly name
+    }),
+    db.plantel.findMany({
+        where: { isActive: true },
+        orderBy: { name: 'asc' }
+    })
+  ]);
 
   const content = {
     es: {
-      hero: "TalentLink: Conectando talento con oportunidad",
-      subhero: "Únete a la comunidad educativa más innovadora. Busca tu próxima gran oportunidad en IECS-IEDIS.",
-      searchPlaceholder: "Buscar puesto (ej. Docente, Admin)...",
+      hero: "Descubre tu futuro en IECS-IEDIS",
+      subhero: "Forma parte de una institución líder. Explora nuestras oportunidades académicas y administrativas.",
+      searchPlaceholder: "Ej. Docente, Coordinador...",
       plantelPlaceholder: "Todos los Planteles",
-      latest: "Vacantes Disponibles",
-      noJobs: "No hay vacantes disponibles con estos criterios por el momento.",
-      apply: "Ver Detalles y Aplicar",
-      searchBtn: "Buscar",
+      latest: "Oportunidades Recientes",
+      noJobs: "No se encontraron vacantes activas en este momento.",
+      apply: "Ver detalles",
+      searchBtn: "Buscar Vacantes",
+      closing: "Cierra el"
     },
     en: {
-      hero: "TalentLink: Connecting Talent with Opportunity",
-      subhero: "Join the most innovative educational community. Find your next great opportunity at IECS-IEDIS.",
-      searchPlaceholder: "Search job (e.g. Teacher, Admin)...",
+      hero: "Discover your future at IECS-IEDIS",
+      subhero: "Join a leading institution. Explore our academic and administrative opportunities.",
+      searchPlaceholder: "E.g. Teacher, Coordinator...",
       plantelPlaceholder: "All Campuses",
-      latest: "Available Vacancies",
-      noJobs: "No vacancies available matching your criteria at the moment.",
-      apply: "View Details & Apply",
-      searchBtn: "Search",
-    },
+      latest: "Recent Opportunities",
+      noJobs: "No active vacancies found at the moment.",
+      apply: "View details",
+      searchBtn: "Search Jobs",
+      closing: "Closes on"
+    }
   };
 
   const t = content[lang] || content.es;
 
   return (
     <div className="min-h-screen bg-slate-50">
-      {/* Pass initialLang to Header. Note: In a real app, use a Context or Cookie for lang persistence */}
       <Header lang={lang} />
       
-      {/* Hero Section */}
-      <div className="bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 py-24 text-center text-white shadow-xl">
-        <div className="container mx-auto px-4">
-          <div className="mb-6 flex justify-center">
-             <span className="rounded-full bg-blue-500/20 px-4 py-1.5 text-sm font-bold text-blue-200 backdrop-blur-sm border border-blue-500/30">
-                Reclutamiento 2025
-             </span>
+      {/* --- HERO SECTION --- */}
+      <div className="relative overflow-hidden bg-slate-900 py-24 lg:py-32">
+        <div className="absolute inset-0 opacity-20" style={{ backgroundImage: 'radial-gradient(#4f46e5 1px, transparent 1px)', backgroundSize: '32px 32px' }}></div>
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-full bg-gradient-to-b from-transparent to-slate-900"></div>
+
+        <div className="container relative mx-auto px-4 text-center">
+          <div className="inline-flex items-center gap-2 rounded-full bg-blue-500/10 border border-blue-500/20 px-3 py-1 text-sm font-medium text-blue-300 mb-8 backdrop-blur-sm">
+            <Sparkles size={14} />
+            <span>Reclutamiento 2025 Activo</span>
           </div>
-          <h1 className="mb-6 text-4xl font-extrabold tracking-tight md:text-6xl drop-shadow-lg">
+
+          <h1 className="mx-auto max-w-4xl text-4xl font-extrabold tracking-tight text-white sm:text-6xl mb-6">
             {t.hero}
           </h1>
-          <p className="mx-auto mb-10 max-w-2xl text-lg text-blue-100">
+          <p className="mx-auto max-w-2xl text-lg text-slate-400 mb-10">
             {t.subhero}
           </p>
           
-          {/* Search Form */}
-          <form className="mx-auto max-w-4xl rounded-xl bg-white p-2 shadow-2xl ring-1 ring-slate-900/5">
-            <div className="flex flex-col gap-2 md:flex-row">
-              <div className="flex flex-1 items-center px-4">
-                <Search className="text-gray-400" />
+          <form className="mx-auto max-w-4xl relative z-10">
+            <div className="flex flex-col md:flex-row gap-2 p-2 bg-white rounded-2xl shadow-2xl shadow-blue-900/20">
+              <div className="flex-1 flex items-center px-4 border-b md:border-b-0 md:border-r border-slate-100">
+                <Search className="text-slate-400" size={20} />
                 <input 
                   type="text" 
                   name="q"
                   defaultValue={query}
                   placeholder={t.searchPlaceholder} 
-                  className="w-full border-none p-3 text-gray-800 placeholder-gray-400 focus:ring-0 outline-none" 
+                  className="w-full p-3 bg-transparent border-none outline-none text-slate-800 placeholder:text-slate-400" 
                 />
               </div>
-              <div className="h-px bg-gray-200 md:h-auto md:w-px"></div>
-              <div className="flex flex-1 items-center px-4">
-                <MapPin className="text-gray-400" />
+              <div className="flex-1 flex items-center px-4">
+                <MapPin className="text-slate-400" size={20} />
                 <select 
                   name="plantel"
-                  defaultValue={plantel}
-                  className="w-full border-none bg-transparent p-3 text-gray-800 outline-none cursor-pointer"
+                  defaultValue={plantelId}
+                  className="w-full p-3 bg-transparent border-none outline-none text-slate-800 cursor-pointer"
                 >
                   <option value="">{t.plantelPlaceholder}</option>
-                  {['PM','PT','SM','ST','PREET','PREEM','ISM','IS','CT','CM','DM','CO'].map(p => (
-                    <option key={p} value={p}>{p}</option>
+                  {plantels.map(p => (
+                    <option key={p.id} value={p.id}>{p.name}</option>
                   ))}
                 </select>
               </div>
-              {/* Hidden input to preserve lang if set */}
               <input type="hidden" name="lang" value={lang} />
               
-              <button type="submit" className="rounded-lg bg-blue-600 px-8 py-3 font-bold text-white transition hover:bg-blue-700 focus:ring-4 focus:ring-blue-300">
+              <button type="submit" className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-xl transition-all shadow-lg shadow-blue-600/30">
                 {t.searchBtn}
               </button>
             </div>
@@ -106,61 +133,75 @@ export default async function Home({ searchParams }) {
         </div>
       </div>
 
-      {/* Job List */}
-      <main className="container mx-auto py-16 px-4">
-        <h2 className="mb-8 flex items-center gap-2 text-2xl font-bold text-slate-800">
-          <Briefcase className="text-blue-600" /> {t.latest}
-        </h2>
+      {/* --- JOBS GRID --- */}
+      <main className="container mx-auto py-20 px-4">
+        <div className="flex items-center justify-between mb-10">
+            <h2 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
+                <Briefcase className="text-blue-600" size={24} /> {t.latest}
+            </h2>
+            <span className="text-sm font-bold text-slate-500 bg-white px-3 py-1 rounded-full border border-slate-200 shadow-sm">
+                {jobs.length} vacantes
+            </span>
+        </div>
         
         {jobs.length === 0 ? (
-          <div className="flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-slate-300 bg-white py-20 text-center">
-            <div className="mb-4 rounded-full bg-slate-100 p-4">
-                <Search className="h-8 w-8 text-slate-400" />
-            </div>
-            <p className="text-lg font-medium text-slate-500">{t.noJobs}</p>
-            <Link href="/" className="mt-4 text-blue-600 hover:underline">Limpiar filtros</Link>
+          <div className="text-center py-20 bg-white rounded-3xl border border-slate-200 border-dashed">
+             <Briefcase size={48} className="mx-auto text-slate-300 mb-4" />
+             <p className="text-lg font-medium text-slate-500">{t.noJobs}</p>
+             <Link href="/" className="text-blue-600 font-bold mt-2 inline-block hover:underline">Ver todas</Link>
           </div>
         ) : (
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-            {jobs.map((job) => (
-              <div key={job.id} className="group relative flex flex-col justify-between overflow-hidden rounded-xl border border-slate-200 bg-white p-6 shadow-sm transition duration-300 hover:-translate-y-1 hover:shadow-xl">
-                <div>
-                    <div className="mb-4 flex items-start justify-between">
-                        <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-blue-50 text-blue-600">
-                            <Briefcase size={24} />
+            {jobs.map((job) => {
+               const isNew = isJobNew(job.createdAt);
+               return (
+                <div key={job.id} className="group relative flex flex-col justify-between bg-white p-6 rounded-2xl border border-slate-200 shadow-sm hover:shadow-xl hover:border-blue-200 hover:-translate-y-1 transition-all duration-300">
+                    {isNew && (
+                        <div className="absolute top-4 right-4 bg-blue-600 text-white text-[10px] font-bold px-2 py-1 rounded-full shadow-lg shadow-blue-600/20">
+                            NUEVO
                         </div>
-                        <span className="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-600">
-                        {job.type}
-                        </span>
-                    </div>
-                    
-                    <h3 className="text-xl font-bold text-slate-900 group-hover:text-blue-600 transition-colors">
-                        {job.title}
-                    </h3>
-                    <p className="mt-1 text-sm font-medium text-slate-500">{job.department}</p>
-                    
-                    <div className="mt-4 flex flex-wrap gap-2">
-                        <div className="flex items-center gap-1 rounded-md bg-slate-50 px-2 py-1 text-xs font-medium text-slate-600 border border-slate-100">
-                            <MapPin size={12} /> {job.plantel}
-                        </div>
-                        <div className="flex items-center gap-1 rounded-md bg-green-50 px-2 py-1 text-xs font-medium text-green-700 border border-green-100">
-                            Abierto
-                        </div>
-                    </div>
-                    
-                    <p className="mt-4 line-clamp-3 text-sm text-slate-500">
-                        {job.description}
-                    </p>
-                </div>
+                    )}
 
-                <Link 
-                  href={`/apply/${job.id}?lang=${lang}`} 
-                  className="mt-6 flex w-full items-center justify-center gap-2 rounded-lg bg-slate-900 py-2.5 text-sm font-bold text-white transition hover:bg-blue-600 group-hover:shadow-lg"
-                >
-                  {t.apply} <ArrowRight size={16} />
-                </Link>
-              </div>
-            ))}
+                    <div>
+                        <div className="h-12 w-12 rounded-xl bg-slate-50 flex items-center justify-center text-slate-700 mb-4 group-hover:bg-blue-50 group-hover:text-blue-600 transition-colors">
+                            <Building2 size={24} />
+                        </div>
+                        
+                        <h3 className="text-xl font-bold text-slate-900 mb-2 group-hover:text-blue-600 transition-colors">
+                            {job.title}
+                        </h3>
+                        
+                        <div className="flex flex-wrap gap-2 mb-4">
+                            {/* Dynamic Plantel Name */}
+                            <span className="inline-flex items-center gap-1 text-xs font-semibold text-slate-500 bg-slate-100 px-2 py-1 rounded-md">
+                                <MapPin size={12} /> {job.plantel.name}
+                            </span>
+                            <span className="inline-flex items-center gap-1 text-xs font-semibold text-slate-500 bg-slate-100 px-2 py-1 rounded-md">
+                                <Briefcase size={12} /> {job.type}
+                            </span>
+                        </div>
+
+                        {job.closingDate && (
+                            <div className="mb-4 flex items-center gap-2 text-xs text-amber-600 font-medium bg-amber-50 px-2 py-1 rounded border border-amber-100">
+                                <Calendar size={12} />
+                                {t.closing}: {job.closingDate.toLocaleDateString()}
+                            </div>
+                        )}
+                        
+                        <p className="text-sm text-slate-500 line-clamp-3 mb-6 leading-relaxed">
+                            {job.description}
+                        </p>
+                    </div>
+
+                    <Link 
+                    href={`/apply/${job.id}?lang=${lang}`} 
+                    className="flex items-center justify-between w-full py-3 px-4 rounded-xl bg-slate-50 text-slate-700 font-bold text-sm group-hover:bg-blue-600 group-hover:text-white transition-all"
+                    >
+                    {t.apply} <ArrowRight size={16} />
+                    </Link>
+                </div>
+               );
+            })}
           </div>
         )}
       </main>
