@@ -3,8 +3,8 @@
 import { db } from "@/lib/db";
 import { auth } from "@/auth";
 import { revalidatePath } from "next/cache";
-// Ensure this path matches where you put the file-handler.js
-import { saveFileToDisk, extractResumeData } from "@/lib/file-handler"; 
+import { saveFileToDisk, extractResumeData } from "@/lib/file-handler";
+import { sendEmail } from "@/lib/email";
 
 // --- 1. CREATE JOB ---
 export async function createJob(formData) {
@@ -81,7 +81,7 @@ export async function applyJob(formData) {
         const savedFile = await saveFileToDisk(file);
         cvUrl = savedFile.url;
 
-        // B. Real Parse of PDF
+        // B. Real Parse of PDF/Word
         const extracted = await extractResumeData(savedFile.buffer, file.type);
         cvText = extracted.text;
         detectedPhone = extracted.phone;
@@ -116,7 +116,7 @@ export async function applyJob(formData) {
   }
 }
 
-// --- 4. UPDATE STATUS ---
+// --- 4. UPDATE STATUS & SEND EMAIL ---
 export async function updateApplicationStatus(appId, data) {
    const session = await auth();
    if (!session || session.user.role === 'CANDIDATE') {
@@ -124,10 +124,51 @@ export async function updateApplicationStatus(appId, data) {
    }
 
    try {
+     // 1. Get current app data to find user email BEFORE update
+     const currentApp = await db.application.findUnique({
+       where: { id: appId },
+       include: { user: true, job: true }
+     });
+
+     if (!currentApp) return { error: "Application not found" };
+
+     // 2. Update DB
      await db.application.update({
        where: { id: appId },
        data: data
      });
+
+     // 3. Email Trigger Logic
+     if (data.status && data.status !== currentApp.status) {
+        let subject = `Actualización: ${currentApp.job.title}`;
+        let html = `<p>Hola <strong>${currentApp.fullName}</strong>,</p>`;
+
+        let shouldSend = false;
+
+        if (data.status === 'INTERVIEW') {
+           shouldSend = true;
+           html += `<p>Nos complace informarte que tu perfil ha avanzado a la etapa de <strong>Entrevistas</strong>.</p>`;
+           html += `<p>Pronto nos pondremos en contacto contigo para coordinar los detalles.</p>`;
+        } else if (data.status === 'HIRED') {
+           shouldSend = true;
+           subject = "¡Felicidades! Bienvenido a IECS-IEDIS";
+           html += `<p>¡Tenemos buenas noticias! Has sido seleccionado para la vacante.</p>`;
+           html += `<p>El equipo de Recursos Humanos te contactará para la firma de contrato.</p>`;
+        } else if (data.status === 'REJECTED') {
+           shouldSend = true;
+           html += `<p>Agradecemos tu interés y el tiempo dedicado a nuestro proceso de selección.</p>`;
+           html += `<p>En esta ocasión hemos decidido avanzar con otros candidatos, pero conservaremos tu CV para futuras oportunidades.</p>`;
+        }
+
+        if (shouldSend) {
+           await sendEmail({
+              to: currentApp.user.email,
+              subject: subject,
+              html: html
+           });
+        }
+     }
+     
      revalidatePath('/dashboard');
      return { success: true };
    } catch (error) {

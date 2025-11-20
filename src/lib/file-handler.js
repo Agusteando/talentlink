@@ -1,6 +1,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import pdf from 'pdf-parse';
+import mammoth from 'mammoth';
 
 // Helper to save file to disk (Windows Server safe)
 export async function saveFileToDisk(file) {
@@ -27,7 +28,7 @@ export async function saveFileToDisk(file) {
   };
 }
 
-// Real PDF Extraction Logic
+// Real PDF & Word Extraction Logic
 export async function extractResumeData(buffer, mimeType) {
   let text = "";
   
@@ -35,28 +36,31 @@ export async function extractResumeData(buffer, mimeType) {
     if (mimeType === 'application/pdf') {
       const data = await pdf(buffer);
       text = data.text;
-    } else {
-      // For Word docs, we'd need 'mammoth', for now we mark it
-      text = "Formato Word: Extracción de texto pendiente de implementación (Requiere librería Mammoth).";
+    } 
+    // REAL DOCX PARSING
+    else if (mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
+      const result = await mammoth.extractRawText({ buffer: buffer });
+      text = result.value;
+    } 
+    else {
+      text = "Formato no soportado para extracción de texto automática.";
     }
   } catch (error) {
-    console.error("Error parsing PDF:", error);
-    text = "Error al leer el archivo.";
+    console.error("Error parsing file:", error);
+    text = "Error de lectura de archivo.";
   }
 
-  // Real Regex to find contacts in the text
-  // 1. Find emails
+  // Real Regex to find contacts
   const emailRegex = /[a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+\.[a-zA-Z0-9._-]+/gi;
   const emails = text.match(emailRegex);
   const detectedEmail = emails ? emails[0] : "";
 
-  // 2. Find phone numbers (generic formats)
   const phoneRegex = /(\+\d{1,3}[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}/g;
   const phones = text.match(phoneRegex);
   const detectedPhone = phones ? phones[0] : "";
 
   return {
-    text: text.substring(0, 10000), // MySQL TEXT limit safety
+    text: text.substring(0, 10000), // Safety limit for MySQL TEXT column
     email: detectedEmail,
     phone: detectedPhone
   };
