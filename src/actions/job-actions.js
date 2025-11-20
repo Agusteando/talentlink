@@ -10,7 +10,7 @@ import { sendEmail } from "@/lib/email";
 // --- 1. CREATE JOB ---
 export async function createJob(formData) {
   const session = await auth();
-  if (!session || session.user.role !== 'ADMIN') return { error: "Unauthorized" };
+  if (!session || session.user.role !== 'ADMIN') return { error: "No tienes permisos para crear vacantes." };
 
   const closingDateStr = formData.get('closingDate');
 
@@ -21,22 +21,23 @@ export async function createJob(formData) {
         description: formData.get('description'),
         plantelId: formData.get('plantelId'),
         department: formData.get('department'),
-        status: 'OPEN',
+        status: formData.get('status') || 'OPEN',
+        type: 'Tiempo Completo',
         closingDate: closingDateStr ? new Date(closingDateStr) : null
       }
     });
-    revalidatePath('/dashboard');
+    revalidatePath('/dashboard/jobs');
     return { success: true };
   } catch (error) {
     console.error(error);
-    return { error: "Error creando vacante" };
+    return { error: "Error de base de datos al crear la vacante." };
   }
 }
 
 // --- 2. UPDATE JOB ---
 export async function updateJob(formData) {
     const session = await auth();
-    if (!session || session.user.role !== 'ADMIN') return { error: "Unauthorized" };
+    if (!session || session.user.role !== 'ADMIN') return { error: "No autorizado." };
   
     const jobId = formData.get('jobId');
     const closingDateStr = formData.get('closingDate');
@@ -53,19 +54,37 @@ export async function updateJob(formData) {
           closingDate: closingDateStr ? new Date(closingDateStr) : null
         }
       });
-      revalidatePath('/dashboard');
+      revalidatePath('/dashboard/jobs');
       return { success: true };
     } catch (error) {
-      return { error: "Error actualizando" };
+      return { error: "Error al actualizar la vacante." };
     }
 }
 
-// --- 3. APPLY JOB (WITH GOOGLE RECAPTCHA) ---
+// --- 3. DELETE JOB ---
+export async function deleteJob(jobId) {
+    const session = await auth();
+    if (!session || session.user.role !== 'ADMIN') return { error: "No autorizado." };
+
+    try {
+        // Check if it has applications first?
+        // In this requirement, we allow forced deletion, or you could block it.
+        // Prisma Cascade Delete is usually set on schema, so this deletes apps too.
+        await db.job.delete({ where: { id: jobId } });
+        revalidatePath('/dashboard/jobs');
+        return { success: true };
+    } catch (error) {
+        console.error(error);
+        return { error: "Error al eliminar. Es posible que tenga registros dependientes." };
+    }
+}
+
+// --- 4. APPLY JOB (With Google ReCAPTCHA) ---
 export async function applyJob(formData) {
   const token = formData.get('g-recaptcha-response');
 
   // 1. Verify Captcha with Google
-  if (!token) return { error: "Por favor completa el captcha." };
+  if (!token) return { error: "Por favor completa el captcha de seguridad." };
 
   try {
     const verifyRes = await fetch('https://www.google.com/recaptcha/api/siteverify', {
@@ -76,11 +95,11 @@ export async function applyJob(formData) {
     const verifyJson = await verifyRes.json();
     
     if (!verifyJson.success) {
-        return { error: "Error de seguridad (Captcha). Intenta de nuevo." };
+        return { error: "Validación de seguridad fallida. Intenta de nuevo." };
     }
   } catch (err) {
     console.error("Captcha Error:", err);
-    return { error: "Error conectando con servicio de seguridad." };
+    return { error: "Error de conexión con el servicio de seguridad." };
   }
 
   // 2. Process Application
@@ -113,7 +132,7 @@ export async function applyJob(formData) {
   try {
     await db.application.create({
       data: {
-        userId: session?.user?.id || null, 
+        userId: session?.user?.id || null, // Null if guest
         jobId: jobId,
         fullName: formData.get('fullName'),
         phone: finalPhone, 
@@ -123,7 +142,7 @@ export async function applyJob(formData) {
       }
     });
     
-    // Professional HTML Email
+    // Send Confirmation Email
     if (finalEmail) {
         await sendEmail({
             to: finalEmail,
@@ -144,6 +163,7 @@ export async function applyJob(formData) {
         });
     }
 
+    // If user was logged in, revalidate their applications list
     if(session?.user?.id) revalidatePath('/my-applications');
     
     return { success: true, isGuest: !session?.user?.id };
@@ -153,11 +173,11 @@ export async function applyJob(formData) {
   }
 }
 
-// --- 4. UPDATE STATUS ---
+// --- 5. UPDATE APPLICATION STATUS ---
 export async function updateApplicationStatus(appId, data) {
     const session = await auth();
     if (!session || session.user.role === 'CANDIDATE') {
-       return { error: "Unauthorized" };
+       return { error: "No autorizado." };
     }
  
     try {
@@ -166,33 +186,52 @@ export async function updateApplicationStatus(appId, data) {
         include: { user: true, job: true }
       });
  
-      if (!currentApp) return { error: "Application not found" };
+      if (!currentApp) return { error: "Aplicación no encontrada." };
  
       await db.application.update({
         where: { id: appId },
         data: data
       });
  
-      // Email Notifications Logic (Simplified for brevity, same as before)
+      // Status Change Notifications
       if (data.status && data.status !== currentApp.status) {
          const emailTarget = currentApp.email || currentApp.user?.email;
+         
          if (emailTarget) {
             let subject = `Actualización de Estado: ${currentApp.job.title}`;
-            let message = `Tu estatus ha cambiado a: ${data.status}`;
-            if(data.status === 'INTERVIEW') message = "Felicidades, has avanzado a la etapa de entrevistas.";
-            if(data.status === 'REJECTED') message = "Gracias por participar. En este momento no avanzaremos con tu perfil.";
-            
-            await sendEmail({ 
-                to: emailTarget, 
-                subject, 
-                html: `<p>${message}</p>` 
-            });
+            let message = "";
+
+            if (data.status === 'INTERVIEW') {
+                message = `<p>Nos complace informarte que tu perfil ha avanzado a la etapa de <strong>Entrevistas</strong>. Pronto te contactaremos para agendar.</p>`;
+            } else if (data.status === 'HIRED') {
+                subject = "¡Felicidades! Bienvenido a IECS-IEDIS";
+                message = `<p>¡Tenemos buenas noticias! Has sido seleccionado para la vacante.</p>`;
+            } else if (data.status === 'REJECTED') {
+                message = `<p>Agradecemos tu interés. En esta ocasión hemos decidido avanzar con otros candidatos, pero mantendremos tu CV en nuestra base de datos para futuras oportunidades.</p>`;
+            }
+
+            if (message) {
+                await sendEmail({ 
+                    to: emailTarget, 
+                    subject, 
+                    html: `
+                        <div style="font-family: sans-serif;">
+                            <p>Hola <strong>${currentApp.fullName}</strong>,</p>
+                            ${message}
+                            <hr style="border:0; border-top:1px solid #eee; margin: 20px 0;" />
+                            <small style="color: #888;">TalentLink - Reclutamiento</small>
+                        </div>
+                    ` 
+                });
+            }
          }
       }
       
       revalidatePath('/dashboard');
+      revalidatePath(`/dashboard/application/${appId}`);
       return { success: true };
     } catch (error) {
-      return { error: "Error actualizando estado" };
+      console.error(error);
+      return { error: "Error al actualizar estado." };
     }
 }
