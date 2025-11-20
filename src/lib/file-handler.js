@@ -1,7 +1,5 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import pdf from 'pdf-parse';
-import mammoth from 'mammoth';
 
 // Helper to save file to disk (Windows Server safe)
 export async function saveFileToDisk(file) {
@@ -34,11 +32,17 @@ export async function extractResumeData(buffer, mimeType) {
   
   try {
     if (mimeType === 'application/pdf') {
+      // DYNAMIC IMPORT: Fixes "await isn't allowed" build error
+      const pdfModule = await import('pdf-parse');
+      const pdf = pdfModule.default || pdfModule; // Handle CJS/ESM interop
       const data = await pdf(buffer);
       text = data.text;
     } 
     // REAL DOCX PARSING
     else if (mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
+      // DYNAMIC IMPORT
+      const mammothModule = await import('mammoth');
+      const mammoth = mammothModule.default || mammothModule;
       const result = await mammoth.extractRawText({ buffer: buffer });
       text = result.value;
     } 
