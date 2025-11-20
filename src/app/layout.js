@@ -1,6 +1,7 @@
 import { Inter } from "next/font/google";
-import "./globals.css";
+import "./globals.css"; 
 import { SessionProvider } from "next-auth/react";
+import ToasterProvider from "@/components/ui/ToasterProvider"; 
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -17,6 +18,7 @@ export default function RootLayout({ children }) {
     <html lang="es">
       <body className={`${inter.className} bg-slate-50 text-slate-900 antialiased`}>
         <SessionProvider>
+          <ToasterProvider />
           {children}
         </SessionProvider>
       </body>

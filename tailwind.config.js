@@ -1,10 +1,7 @@
 /** @type {import('tailwindcss').Config} */
 module.exports = {
   content: [
-    "./src/pages/**/*.{js,ts,jsx,tsx,mdx}",
-    "./src/components/**/*.{js,ts,jsx,tsx,mdx}",
-    "./src/app/**/*.{js,ts,jsx,tsx,mdx}",
-    "./src/actions/**/*.{js,ts,jsx,tsx,mdx}", // Scan actions just in case
+    "./src/**/*.{js,jsx,ts,tsx}", // This broad pattern catches everything inside src
   ],
   theme: {
     extend: {
