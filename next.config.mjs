@@ -1,7 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   experimental: {
-    // Prevents the "Module not found" errors for binary libs
+    // Explicitly externalize these to prevent build failures with PDF/Word parsers
     serverComponentsExternalPackages: ['pdf-parse', 'mammoth', 'pdfjs-dist'],
   },
   webpack: (config) => {
@@ -14,4 +14,4 @@ const nextConfig = {
   },
 };
 
-module.exports = nextConfig;
+export default nextConfig;
