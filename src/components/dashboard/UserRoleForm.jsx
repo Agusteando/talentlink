@@ -1,4 +1,5 @@
 'use client';
+
 import { updateUserRole } from '@/actions/user-actions';
 import { Shield } from 'lucide-react';
 

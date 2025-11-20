@@ -1,20 +1,34 @@
 'use client';
-import { createJob } from '@/actions/job-actions';
+import { createJob } from '@/actions/job-actions'; // Named import
 import { ArrowLeft, Save } from 'lucide-react';
 import Link from 'next/link';
 import { useFormStatus } from 'react-dom';
+import { toast } from 'react-hot-toast';
+import { useRouter } from 'next/navigation';
 
 function SubmitButton() {
   const { pending } = useFormStatus();
   return (
     <button disabled={pending} className="flex items-center gap-2 rounded-lg bg-blue-600 px-6 py-3 font-bold text-white hover:bg-blue-700 disabled:opacity-50">
       <Save size={20} />
-      {pending ? 'Guardando...' : 'Publicar Vacante'}
+      {pending ? 'Publicando...' : 'Publicar Vacante'}
     </button>
   );
 }
 
 export default function NewJobPage() {
+  const router = useRouter();
+
+  async function handleSubmit(formData) {
+    const res = await createJob(formData);
+    if (res?.error) {
+      toast.error(res.error);
+    } else {
+      toast.success("Vacante creada exitosamente");
+      router.push('/dashboard');
+    }
+  }
+
   return (
     <div className="min-h-screen bg-slate-50 p-8">
       <div className="mx-auto max-w-3xl">
@@ -26,16 +40,13 @@ export default function NewJobPage() {
         </div>
 
         <div className="rounded-xl bg-white p-8 shadow-lg">
-          <form action={createJob} className="space-y-6">
-            
-            {/* Job Title */}
+          <form action={handleSubmit} className="space-y-6">
             <div>
               <label className="mb-2 block text-sm font-bold text-slate-700">Título del Puesto</label>
               <input type="text" name="title" placeholder="Ej. Docente de Inglés" required 
                 className="w-full rounded-lg border border-gray-300 p-3 focus:border-blue-500 focus:outline-none" />
             </div>
 
-            {/* Grid for Plantel & Dept */}
             <div className="grid gap-6 md:grid-cols-2">
               <div>
                 <label className="mb-2 block text-sm font-bold text-slate-700">Plantel</label>
@@ -52,7 +63,6 @@ export default function NewJobPage() {
               </div>
             </div>
 
-            {/* Description */}
             <div>
               <label className="mb-2 block text-sm font-bold text-slate-700">Descripción del Puesto</label>
               <textarea name="description" rows={6} placeholder="Responsabilidades, requisitos..." required 

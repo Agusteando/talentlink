@@ -3,10 +3,7 @@ import { auth } from '@/auth';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { ArrowLeft } from 'lucide-react';
-import UserRoleForm from '@/components/dashboard/UserRoleForm';
-
-// Force dynamic rendering to prevent build caching issues
-export const dynamic = 'force-dynamic';
+import UserRoleForm from '@/components/dashboard/UserRoleForm'; // This imports the 'export default'
 
 export default async function UsersPage() {
   const session = await auth();
@@ -35,7 +32,6 @@ export default async function UsersPage() {
             {users.map(user => (
                 <div key={user.id} className="flex flex-col gap-4 rounded-xl bg-white p-6 shadow-sm border border-slate-200 md:flex-row md:items-center md:justify-between transition hover:shadow-md">
                     <div className="flex items-center gap-4">
-                        {/* Fallback if image is null */}
                         <div className="h-12 w-12 rounded-full bg-slate-200 overflow-hidden flex items-center justify-center">
                             {user.image ? (
                                 <img src={user.image} alt="" className="h-full w-full object-cover" />
@@ -49,7 +45,6 @@ export default async function UsersPage() {
                         </div>
                     </div>
 
-                    {/* Client Component for Form Logic */}
                     <UserRoleForm user={user} />
                 </div>
             ))}

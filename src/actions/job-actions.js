@@ -1,48 +1,67 @@
-'use server'
-import { db } from "@/lib/db"
-import { auth } from "@/auth"
-import { revalidatePath } from "next/cache"
-import { saveFileToDisk, extractResumeData } from "@/lib/file-handler"; // Import our new real logic
+'use server';
 
-// --- Job Management ---
+import { db } from "@/lib/db";
+import { auth } from "@/auth";
+import { revalidatePath } from "next/cache";
+// Ensure this path matches where you put the file-handler.js
+import { saveFileToDisk, extractResumeData } from "@/lib/file-handler"; 
+
+// --- 1. CREATE JOB ---
 export async function createJob(formData) {
   const session = await auth();
-  if (session.user.role !== 'ADMIN') return { error: "Unauthorized" };
+  if (!session || session.user.role !== 'ADMIN') {
+    return { error: "Unauthorized" };
+  }
 
-  await db.job.create({
-    data: {
-      title: formData.get('title'),
-      description: formData.get('description'),
-      plantel: formData.get('plantel'),
-      department: formData.get('department'),
-    }
-  });
-  revalidatePath('/dashboard');
-  return { success: true };
+  try {
+    await db.job.create({
+      data: {
+        title: formData.get('title'),
+        description: formData.get('description'),
+        plantel: formData.get('plantel'),
+        department: formData.get('department'),
+        status: 'OPEN',
+        type: 'Tiempo Completo'
+      }
+    });
+    revalidatePath('/dashboard');
+    return { success: true };
+  } catch (error) {
+    console.error("Create Job Error:", error);
+    return { error: "Error creando vacante" };
+  }
 }
 
+// --- 2. UPDATE JOB ---
 export async function updateJob(formData) {
   const session = await auth();
-  if (!session || session.user.role !== 'ADMIN') return { error: "Unauthorized" };
+  if (!session || session.user.role !== 'ADMIN') {
+    return { error: "Unauthorized" };
+  }
 
   const jobId = formData.get('jobId');
   
-  await db.job.update({
-    where: { id: jobId },
-    data: {
-      title: formData.get('title'),
-      description: formData.get('description'),
-      plantel: formData.get('plantel'),
-      department: formData.get('department'),
-      status: formData.get('status'), 
-    }
-  });
-  
-  revalidatePath('/dashboard');
-  return { success: true };
+  try {
+    await db.job.update({
+      where: { id: jobId },
+      data: {
+        title: formData.get('title'),
+        description: formData.get('description'),
+        plantel: formData.get('plantel'),
+        department: formData.get('department'),
+        status: formData.get('status'), 
+      }
+    });
+    
+    revalidatePath('/dashboard');
+    return { success: true };
+  } catch (error) {
+    console.error("Update Job Error:", error);
+    return { error: "Error actualizando vacante" };
+  }
 }
 
-// --- Application Handling (REAL PARSING) ---
+// --- 3. APPLY JOB (REAL PARSING) ---
 export async function applyJob(formData) {
   const session = await auth();
   if (!session) return { error: "Not authenticated" };
@@ -55,7 +74,7 @@ export async function applyJob(formData) {
   let detectedPhone = "";
   let detectedEmail = "";
   
-  // 1. Real File Handling
+  // Real File Handling
   if (file && file.size > 0) {
     try {
         // A. Save to Windows Server Disk
@@ -70,39 +89,49 @@ export async function applyJob(formData) {
 
     } catch (e) {
         console.error("Error processing file:", e);
-        // Fail gracefully: allow application but note the error
         cvText = "Error procesando archivo.";
     }
   }
 
-  // 2. Save to DB (Merge Form Data with Detected Data)
-  await db.application.create({
-    data: {
-      userId: session.user.id,
-      jobId: jobId,
-      fullName: formData.get('fullName'),
-      // Use Form data first, if empty use detected data
-      phone: formData.get('phone') || detectedPhone, 
-      email: formData.get('email') || detectedEmail,
-      cvUrl: cvUrl,
-      cvText: cvText,
-      requirementsChecklist: {} 
-    }
-  });
-  
-  revalidatePath('/my-applications');
-  return { success: true };
+  try {
+    await db.application.create({
+      data: {
+        userId: session.user.id,
+        jobId: jobId,
+        fullName: formData.get('fullName'),
+        // Use Form data first, if empty use detected data
+        phone: formData.get('phone') || detectedPhone, 
+        email: formData.get('email') || detectedEmail,
+        cvUrl: cvUrl,
+        cvText: cvText,
+        requirementsChecklist: {} 
+      }
+    });
+    
+    revalidatePath('/my-applications');
+    return { success: true };
+  } catch (error) {
+    console.error("Apply Error:", error);
+    return { error: "Error al aplicar" };
+  }
 }
 
+// --- 4. UPDATE STATUS ---
 export async function updateApplicationStatus(appId, data) {
    const session = await auth();
-   if (session.user.role === 'CANDIDATE') return { error: "Unauthorized" };
+   if (!session || session.user.role === 'CANDIDATE') {
+      return { error: "Unauthorized" };
+   }
 
-   await db.application.update({
-     where: { id: appId },
-     data: data
-   });
-   
-   // Email trigger logic removed for brevity, can be re-added here
-   revalidatePath('/dashboard');
+   try {
+     await db.application.update({
+       where: { id: appId },
+       data: data
+     });
+     revalidatePath('/dashboard');
+     return { success: true };
+   } catch (error) {
+     console.error("Status Update Error:", error);
+     return { error: "Error actualizando estado" };
+   }
 }
