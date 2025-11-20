@@ -1,21 +1,30 @@
-// src/auth.config.js
+// --- src/auth.config.js ---
 export const authConfig = {
   pages: {
-    signIn: '/', 
+    signIn: '/', // If they get kicked out, send them Home
     error: '/',  
   },
   callbacks: {
-    // FIX: Destructure 'nextUrl' directly from the 'request' object
     authorized({ auth, request: { nextUrl } }) {
       const isLoggedIn = !!auth?.user;
-      const isOnDashboard = nextUrl.pathname.startsWith('/dashboard');
+      const role = auth?.user?.role;
 
+      // 1. Protect Dashboard Routes (Admin/Director/RH)
+      const isOnDashboard = nextUrl.pathname.startsWith('/dashboard');
       if (isOnDashboard) {
-        if (isLoggedIn) return true;
-        return false; // Redirect unauthenticated users to login page
+        if (!isLoggedIn) return false; // Redirect unauthenticated to Home
+        if (role === 'CANDIDATE') return Response.redirect(new URL('/my-applications', nextUrl));
+        return true; // Grant access
       }
-      
-      // Allow access to all other routes
+
+      // 2. Protect Candidate Routes
+      const isOnMyApps = nextUrl.pathname.startsWith('/my-applications');
+      if (isOnMyApps) {
+        if (!isLoggedIn) return false;
+        return true;
+      }
+
+      // 3. Public Routes (Home, Apply) -> Allow everyone
       return true;
     },
   },

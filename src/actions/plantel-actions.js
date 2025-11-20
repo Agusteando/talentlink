@@ -7,7 +7,7 @@ import { revalidatePath } from "next/cache";
 
 export async function createPlantel(formData) {
     const session = await auth();
-    if (session?.user?.role !== 'ADMIN') return { error: "Unauthorized" };
+    if (session?.user?.role !== 'ADMIN') return { error: "No autorizado" };
 
     try {
         await db.plantel.create({
@@ -17,26 +17,26 @@ export async function createPlantel(formData) {
                 address: formData.get('address'),
                 lat: parseFloat(formData.get('lat') || 0),
                 lng: parseFloat(formData.get('lng') || 0),
-                isActive: true
+                isActive: formData.get('isActive') === 'true'
             }
         });
         revalidatePath('/dashboard/plantels');
-        return { success: true };
+        return { success: true, message: "Plantel creado correctamente" };
     } catch (e) {
-        console.error(e);
-        return { error: "Error creando plantel. Revisa si el código ya existe." };
+        return { error: "Error: El código del plantel ya existe." };
     }
 }
 
 export async function updatePlantel(formData) {
     const session = await auth();
-    if (session?.user?.role !== 'ADMIN') return { error: "Unauthorized" };
+    if (session?.user?.role !== 'ADMIN') return { error: "No autorizado" };
 
     try {
         await db.plantel.update({
             where: { id: formData.get('id') },
             data: {
                 name: formData.get('name'),
+                code: formData.get('code').toUpperCase(),
                 address: formData.get('address'),
                 lat: parseFloat(formData.get('lat') || 0),
                 lng: parseFloat(formData.get('lng') || 0),
@@ -44,9 +44,29 @@ export async function updatePlantel(formData) {
             }
         });
         revalidatePath('/dashboard/plantels');
-        return { success: true };
+        return { success: true, message: "Plantel actualizado" };
     } catch (e) {
-        console.error(e);
-        return { error: "Error actualizando plantel" };
+        return { error: "Error al actualizar. Revisa los datos." };
+    }
+}
+
+export async function deletePlantel(id) {
+    const session = await auth();
+    if (session?.user?.role !== 'ADMIN') return { error: "No autorizado" };
+
+    try {
+        // Safety Check: Don't delete if it has Jobs or Users
+        const hasJobs = await db.job.count({ where: { plantelId: id } });
+        const hasUsers = await db.user.count({ where: { plantelId: id } });
+
+        if (hasJobs > 0 || hasUsers > 0) {
+            return { error: `No se puede eliminar: Tiene ${hasJobs} vacantes y ${hasUsers} usuarios asignados.` };
+        }
+
+        await db.plantel.delete({ where: { id } });
+        revalidatePath('/dashboard/plantels');
+        return { success: true, message: "Plantel eliminado" };
+    } catch (e) {
+        return { error: "Error de base de datos al eliminar." };
     }
 }

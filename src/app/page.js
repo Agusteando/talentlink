@@ -14,34 +14,24 @@ function isJobNew(date) {
 export default async function Home({ searchParams }) {
   const query = searchParams?.q || "";
   const plantelId = searchParams?.plantel || "";
-  const lang = searchParams?.lang || "es";
-
-  // --- DATE FILTER LOGIC ---
+  
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
   const whereClause = {
     status: "OPEN",
     AND: [
-        {
-            OR: [
-                { closingDate: null },
-                { closingDate: { gte: today } }
-            ]
-        }
+        { OR: [{ closingDate: null }, { closingDate: { gte: today } }] }
     ],
-    ...(query && {
-      title: { contains: query },
-    }),
+    ...(query && { title: { contains: query } }),
     ...(plantelId && { plantelId: plantelId }),
   };
 
-  // Fetch Jobs AND Plantels for the filter
   const [jobs, plantels] = await Promise.all([
     db.job.findMany({
         where: whereClause,
         orderBy: { createdAt: "desc" },
-        include: { plantel: true } // Important: Fetch friendly name
+        include: { plantel: true } 
     }),
     db.plantel.findMany({
         where: { isActive: true },
@@ -49,36 +39,9 @@ export default async function Home({ searchParams }) {
     })
   ]);
 
-  const content = {
-    es: {
-      hero: "Descubre tu futuro en IECS-IEDIS",
-      subhero: "Forma parte de una institución líder. Explora nuestras oportunidades académicas y administrativas.",
-      searchPlaceholder: "Ej. Docente, Coordinador...",
-      plantelPlaceholder: "Todos los Planteles",
-      latest: "Oportunidades Recientes",
-      noJobs: "No se encontraron vacantes activas en este momento.",
-      apply: "Ver detalles",
-      searchBtn: "Buscar Vacantes",
-      closing: "Cierra el"
-    },
-    en: {
-      hero: "Discover your future at IECS-IEDIS",
-      subhero: "Join a leading institution. Explore our academic and administrative opportunities.",
-      searchPlaceholder: "E.g. Teacher, Coordinator...",
-      plantelPlaceholder: "All Campuses",
-      latest: "Recent Opportunities",
-      noJobs: "No active vacancies found at the moment.",
-      apply: "View details",
-      searchBtn: "Search Jobs",
-      closing: "Closes on"
-    }
-  };
-
-  const t = content[lang] || content.es;
-
   return (
     <div className="min-h-screen bg-slate-50">
-      <Header lang={lang} />
+      <Header /> {/* No props needed now */}
       
       {/* --- HERO SECTION --- */}
       <div className="relative overflow-hidden bg-slate-900 py-24 lg:py-32">
@@ -92,10 +55,10 @@ export default async function Home({ searchParams }) {
           </div>
 
           <h1 className="mx-auto max-w-4xl text-4xl font-extrabold tracking-tight text-white sm:text-6xl mb-6">
-            {t.hero}
+            Descubre tu futuro en IECS-IEDIS
           </h1>
           <p className="mx-auto max-w-2xl text-lg text-slate-400 mb-10">
-            {t.subhero}
+            Forma parte de una institución líder. Explora nuestras oportunidades académicas y administrativas.
           </p>
           
           <form className="mx-auto max-w-4xl relative z-10">
@@ -106,7 +69,7 @@ export default async function Home({ searchParams }) {
                   type="text" 
                   name="q"
                   defaultValue={query}
-                  placeholder={t.searchPlaceholder} 
+                  placeholder="Ej. Docente, Coordinador..." 
                   className="w-full p-3 bg-transparent border-none outline-none text-slate-800 placeholder:text-slate-400" 
                 />
               </div>
@@ -117,16 +80,15 @@ export default async function Home({ searchParams }) {
                   defaultValue={plantelId}
                   className="w-full p-3 bg-transparent border-none outline-none text-slate-800 cursor-pointer"
                 >
-                  <option value="">{t.plantelPlaceholder}</option>
+                  <option value="">Todos los Planteles</option>
                   {plantels.map(p => (
                     <option key={p.id} value={p.id}>{p.name}</option>
                   ))}
                 </select>
               </div>
-              <input type="hidden" name="lang" value={lang} />
               
               <button type="submit" className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-xl transition-all shadow-lg shadow-blue-600/30">
-                {t.searchBtn}
+                Buscar Vacantes
               </button>
             </div>
           </form>
@@ -137,7 +99,7 @@ export default async function Home({ searchParams }) {
       <main className="container mx-auto py-20 px-4">
         <div className="flex items-center justify-between mb-10">
             <h2 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
-                <Briefcase className="text-blue-600" size={24} /> {t.latest}
+                <Briefcase className="text-blue-600" size={24} /> Oportunidades Recientes
             </h2>
             <span className="text-sm font-bold text-slate-500 bg-white px-3 py-1 rounded-full border border-slate-200 shadow-sm">
                 {jobs.length} vacantes
@@ -147,7 +109,7 @@ export default async function Home({ searchParams }) {
         {jobs.length === 0 ? (
           <div className="text-center py-20 bg-white rounded-3xl border border-slate-200 border-dashed">
              <Briefcase size={48} className="mx-auto text-slate-300 mb-4" />
-             <p className="text-lg font-medium text-slate-500">{t.noJobs}</p>
+             <p className="text-lg font-medium text-slate-500">No se encontraron vacantes activas en este momento.</p>
              <Link href="/" className="text-blue-600 font-bold mt-2 inline-block hover:underline">Ver todas</Link>
           </div>
         ) : (
@@ -172,7 +134,6 @@ export default async function Home({ searchParams }) {
                         </h3>
                         
                         <div className="flex flex-wrap gap-2 mb-4">
-                            {/* Dynamic Plantel Name */}
                             <span className="inline-flex items-center gap-1 text-xs font-semibold text-slate-500 bg-slate-100 px-2 py-1 rounded-md">
                                 <MapPin size={12} /> {job.plantel.name}
                             </span>
@@ -184,7 +145,7 @@ export default async function Home({ searchParams }) {
                         {job.closingDate && (
                             <div className="mb-4 flex items-center gap-2 text-xs text-amber-600 font-medium bg-amber-50 px-2 py-1 rounded border border-amber-100">
                                 <Calendar size={12} />
-                                {t.closing}: {job.closingDate.toLocaleDateString()}
+                                Cierra el: {job.closingDate.toLocaleDateString()}
                             </div>
                         )}
                         
@@ -194,10 +155,10 @@ export default async function Home({ searchParams }) {
                     </div>
 
                     <Link 
-                    href={`/apply/${job.id}?lang=${lang}`} 
+                    href={`/apply/${job.id}`} 
                     className="flex items-center justify-between w-full py-3 px-4 rounded-xl bg-slate-50 text-slate-700 font-bold text-sm group-hover:bg-blue-600 group-hover:text-white transition-all"
                     >
-                    {t.apply} <ArrowRight size={16} />
+                    Ver detalles <ArrowRight size={16} />
                     </Link>
                 </div>
                );

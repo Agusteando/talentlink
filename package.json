@@ -8,9 +8,13 @@
     "start": "next start",
     "lint": "eslint"
   },
+  "prisma": {
+    "seed": "node prisma/seed.js"
+  },
   "dependencies": {
     "@prisma/client": "5.19.1",
     "clsx": "^2.1.1",
+    "cookies-next": "^4.3.0",
     "date-fns": "^4.1.0",
     "dotenv": "^17.2.3",
     "googleapis": "^166.0.0",
