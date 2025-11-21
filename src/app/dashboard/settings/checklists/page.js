@@ -5,12 +5,22 @@ import { redirect } from 'next/navigation';
 import { createChecklistItem, deleteChecklistItem, toggleChecklistItem } from '@/actions/checklist-actions';
 import { Plus, Trash2, ToggleLeft, ToggleRight, ArrowLeft, ListChecks } from 'lucide-react';
 import Link from 'next/link';
+import { PERMISSIONS } from '@/lib/permissions';
 
 export default async function ChecklistsPage() {
   const session = await auth();
-  if (session?.user?.role !== 'ADMIN') redirect('/dashboard');
+  if (!session?.user?.permissions?.includes(PERMISSIONS.MANAGE_CONFIG)) {
+      redirect('/dashboard');
+  }
 
   const items = await db.checklistTemplate.findMany({ orderBy: { createdAt: 'asc' } });
+
+  // UI MAPPING: Convert DB Enums to Spanish Labels
+  const TYPE_LABELS = {
+      TEXT: "Texto Libre",
+      CHECKBOX: "Casilla de Verificación",
+      DATE: "Selector de Fecha"
+  };
 
   return (
     <div className="min-h-screen bg-slate-50 p-8">
@@ -52,7 +62,8 @@ export default async function ChecklistsPage() {
                         </div>
                         <div>
                             <div className="font-bold text-slate-800">{item.name}</div>
-                            <div className="text-xs text-slate-400">{item.type}</div>
+                            {/* USE MAPPING HERE */}
+                            <div className="text-xs text-slate-400">{TYPE_LABELS[item.type] || item.type}</div>
                         </div>
                     </div>
                     

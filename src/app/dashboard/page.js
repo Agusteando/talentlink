@@ -4,7 +4,6 @@ import { auth } from '@/auth';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { 
-  Users, 
   LayoutDashboard,
   LogOut,
   ChevronLeft,
@@ -30,10 +29,11 @@ function isNew(date) {
 
 export default async function Dashboard({ searchParams }) {
   const session = await auth();
-  if (!session || session.user.role === 'CANDIDATE') redirect('/my-applications');
+  // BLOCK CANDIDATES entirely if they somehow slipped through
+  if (!session || session.user.role === 'CANDIDATE') redirect('/');
 
   const query = searchParams?.query || '';
-  const showFavorites = searchParams?.filter === 'favorites'; // NEW FILTER
+  const showFavorites = searchParams?.filter === 'favorites';
   const currentPage = Number(searchParams?.page) || 1;
   const itemsPerPage = 10; 
   const skip = (currentPage - 1) * itemsPerPage;
@@ -42,7 +42,6 @@ export default async function Dashboard({ searchParams }) {
     AND: []
   };
 
-  // Role Filtering
   if (session.user.role === 'DIRECTOR') {
       if (session.user.plantelId) {
         whereClause.AND.push({ job: { plantelId: session.user.plantelId } });
@@ -51,18 +50,18 @@ export default async function Dashboard({ searchParams }) {
       }
   }
 
-  // Search Filtering
   if (query) {
       whereClause.AND.push({
         OR: [
             { fullName: { contains: query } },
             { user: { email: { contains: query } } },
-            { job: { title: { contains: query } } }
+            { job: { title: { contains: query } } },
+            // NEW: SEARCH INSIDE PDF CONTENT
+            { cvText: { contains: query } } 
         ]
       });
   }
 
-  // Favorites Filtering
   if (showFavorites) {
       whereClause.AND.push({
           OR: [
@@ -90,11 +89,11 @@ export default async function Dashboard({ searchParams }) {
   const totalPages = Math.ceil(totalCount / itemsPerPage);
   const totalAppsStat = allAppsForStats.length;
   const interviewApps = allAppsForStats.filter(a => a.status === 'INTERVIEW').length;
-  const hiredApps = allAppsForStats.filter(a => a.status === 'HIRED').length;
   const poolApps = allAppsForStats.filter(a => a.isFavorite || a.status === 'TALENT_POOL').length;
 
   return (
     <div className="min-h-screen bg-slate-50/50">
+      {/* HEADER */}
       <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/80 px-6 py-4 backdrop-blur-xl">
         <div className="mx-auto flex max-w-7xl items-center justify-between">
           <div className="flex items-center gap-3">
@@ -112,15 +111,11 @@ export default async function Dashboard({ searchParams }) {
           </div>
           
           <div className="flex items-center gap-3">
-            {session.user.role === 'ADMIN' && (
-                <>
-                    <Link href="/dashboard/plantels" className="hidden md:flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50 transition-all">
-                        <Users size={16} /> <span>Planteles</span>
-                    </Link>
-                    <Link href="/dashboard/users" className="hidden md:flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50 transition-all">
-                        <Users size={16} /> <span>Usuarios</span>
-                    </Link>
-                </>
+            {/* RH and ADMIN see global options */}
+            {(session.user.role === 'ADMIN' || session.user.role === 'RH') && (
+               <div className="hidden md:flex items-center gap-2 text-sm font-bold text-slate-500">
+                   <span className="bg-slate-100 px-2 py-1 rounded text-[10px] uppercase tracking-wide">Modo Global</span>
+               </div>
             )}
             
             <Link href="/dashboard/jobs/new" className="flex items-center gap-2 rounded-lg bg-slate-900 px-4 py-2 text-sm font-bold text-white shadow-lg shadow-slate-200 hover:bg-blue-600 transition-all">
@@ -138,20 +133,18 @@ export default async function Dashboard({ searchParams }) {
       </header>
 
       <main className="mx-auto max-w-7xl px-6 py-8">
-        {/* Stats */}
+        {/* STATS */}
         <div className="mb-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
            <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
-            <p className="text-sm font-bold text-slate-400 uppercase tracking-wide">Candidatos</p>
-            <div className="flex justify-between items-end">
-                <h3 className="mt-2 text-3xl font-extrabold text-slate-900">{totalAppsStat}</h3>
-            </div>
+            <p className="text-sm font-bold text-slate-400 uppercase tracking-wide">Total Candidatos</p>
+            <h3 className="mt-2 text-3xl font-extrabold text-slate-900">{totalAppsStat}</h3>
           </div>
           <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
             <p className="text-sm font-bold text-blue-400 uppercase tracking-wide">En Entrevista</p>
             <h3 className="mt-2 text-3xl font-extrabold text-blue-700">{interviewApps}</h3>
           </div>
           <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
-            <p className="text-sm font-bold text-purple-500 uppercase tracking-wide">Cartera / Pool</p>
+            <p className="text-sm font-bold text-purple-500 uppercase tracking-wide">Cartera (Pool)</p>
             <h3 className="mt-2 text-3xl font-extrabold text-purple-700">{poolApps}</h3>
           </div>
           <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm flex flex-col justify-center items-center">
@@ -159,18 +152,11 @@ export default async function Dashboard({ searchParams }) {
           </div>
         </div>
 
-        {/* Table */}
+        {/* TABLE */}
         <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
            <div className="border-b border-slate-100 bg-white px-6 py-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
              <div className="flex items-center gap-4">
-                <div>
-                    <h3 className="text-lg font-bold text-slate-800">Base de Talento</h3>
-                    <p className="text-sm text-slate-400">
-                        {showFavorites ? 'Mostrando solo favoritos' : 'Mostrando todos los candidatos'}
-                    </p>
-                </div>
-                
-                {/* Favorites Toggle */}
+                <h3 className="text-lg font-bold text-slate-800">Candidatos Recientes</h3>
                 <Link 
                     href={showFavorites ? '/dashboard' : '/dashboard?filter=favorites'}
                     className={`px-3 py-1.5 rounded-full text-xs font-bold flex items-center gap-2 border transition
@@ -182,7 +168,7 @@ export default async function Dashboard({ searchParams }) {
                     Cartera
                 </Link>
              </div>
-             <SearchInput placeholder="Buscar candidato..." />
+             <SearchInput placeholder="Buscar por nombre, email o CV..." />
           </div>
 
           <div className="overflow-x-auto">
@@ -190,7 +176,7 @@ export default async function Dashboard({ searchParams }) {
               <thead className="bg-slate-50/80 text-xs uppercase text-slate-500">
                 <tr>
                   <th className="px-6 py-4 font-bold">Candidato</th>
-                  <th className="px-6 py-4 font-bold">Vacante / Campus</th>
+                  <th className="px-6 py-4 font-bold">Vacante</th>
                   <th className="px-6 py-4 font-bold">Actividad</th>
                   <th className="px-6 py-4 font-bold text-center">Estado</th>
                   <th className="px-6 py-4 font-bold text-right"></th>
@@ -213,7 +199,7 @@ export default async function Dashboard({ searchParams }) {
                                     {app.isFavorite && <Star size={12} className="text-amber-400 fill-amber-400"/>}
                                     {isNew(app.createdAt) && <span className="bg-red-100 text-red-700 text-[9px] px-1.5 py-0.5 rounded font-bold">NUEVO</span>}
                                 </div>
-                                <div className="text-xs text-slate-500">{app.email || app.user?.email}</div>
+                                <div className="text-xs text-slate-500">{app.email}</div>
                             </div>
                         </div>
                       </td>
@@ -254,6 +240,7 @@ export default async function Dashboard({ searchParams }) {
             </table>
           </div>
           
+          {/* PAGINATION */}
           <div className="border-t border-slate-100 bg-slate-50 p-4 flex items-center justify-between">
              <Link href={`/dashboard?page=${currentPage > 1 ? currentPage - 1 : 1}&query=${query}&filter=${showFavorites ? 'favorites' : ''}`} className={`flex items-center gap-1 text-sm font-bold px-3 py-2 rounded-lg transition ${currentPage <= 1 ? 'text-slate-300 pointer-events-none' : 'text-slate-600 hover:bg-white hover:shadow-sm'}`}>
                 <ChevronLeft size={16} /> Anterior

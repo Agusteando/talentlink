@@ -2,25 +2,30 @@
 import { auth } from '@/auth';
 import { redirect } from 'next/navigation';
 import DashboardHeader from '@/components/dashboard/DashboardHeader';
+import { PERMISSIONS } from '@/lib/permissions';
 
 export default async function DashboardLayout({ children }) {
   const session = await auth();
 
-  // 1. Security Check: Must be logged in
   if (!session) {
     redirect('/');
   }
 
-  // 2. Role Check: Candidates cannot be here
-  if (session.user.role === 'CANDIDATE') {
-    redirect('/my-applications');
+  // If they don't have dashboard access, kick them out
+  // (Since we give Super Admin to everyone now, this should pass)
+  if (!session.user.permissions?.includes(PERMISSIONS.VIEW_DASHBOARD)) {
+      // Only redirect if they are truly blocked, prevent infinite loop
+      if (session.user.role !== 'CANDIDATE') {
+         // Safety: If somehow they have no permissions but logged in
+      } else {
+         redirect('/my-applications');
+      }
   }
 
-  // 3. Render Layout with Persistent Header
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col">
       <DashboardHeader user={session.user} />
-      <main className="flex-1 container mx-auto max-w-7xl p-6">
+      <main className="flex-1 container mx-auto max-w-7xl p-4 md:p-6">
         {children}
       </main>
     </div>

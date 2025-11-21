@@ -8,6 +8,8 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// --- CORE INFRASTRUCTURE ---
+
 model Plantel {
   id          String   @id @default(cuid())
   name        String   
@@ -30,13 +32,24 @@ model JobTitle {
   jobs      Job[]
 }
 
-// NEW: Dynamic Checklist Configuration (Admin defines these)
 model ChecklistTemplate {
   id        String   @id @default(cuid())
-  name      String   // e.g. "Signia ID", "Entrevista Técnica", "Examen Médico"
-  type      String   @default("TEXT") // TEXT, CHECKBOX, DATE
+  name      String   
+  type      String   @default("TEXT") 
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
+}
+
+// --- DYNAMIC RBAC SYSTEM ---
+
+model Role {
+  id          String   @id @default(cuid())
+  name        String   @unique 
+  isGlobal    Boolean  @default(false) 
+  permissions String   @db.Text 
+  users       User[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }
 
 model User {
@@ -45,27 +58,34 @@ model User {
   email           String?   @unique
   emailVerified   DateTime?
   image           String?
-  role            String    @default("CANDIDATE") 
+  
+  roleId          String?
+  // Explicit map to prevent conflicts
+  role            Role?     @relation(fields: [roleId], references: [id], map: "fk_user_role")
+  
   plantelId       String?
-  plantel         Plantel?  @relation(fields: [plantelId], references: [id])
+  plantel         Plantel?  @relation(fields: [plantelId], references: [id], map: "fk_user_plantel")
+  
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
   applications    Application[]
   comments        Comment[] 
 }
 
+// --- BUSINESS LOGIC ---
+
 model Job {
   id          String   @id @default(cuid())
   title       String   
   jobTitleId  String?
-  jobTitle    JobTitle? @relation(fields: [jobTitleId], references: [id])
+  jobTitle    JobTitle? @relation(fields: [jobTitleId], references: [id], map: "fk_job_title")
   description String   @db.Text
   department  String
   type        String   @default("Tiempo Completo")
   status      String   @default("OPEN") 
   closingDate DateTime?
   plantelId   String
-  plantel     Plantel @relation(fields: [plantelId], references: [id])
+  plantel     Plantel @relation(fields: [plantelId], references: [id], map: "fk_job_plantel")
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   applications Application[]
@@ -74,9 +94,9 @@ model Job {
 model Application {
   id          String   @id @default(cuid())
   userId      String?
-  user        User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  user        User?    @relation(fields: [userId], references: [id], onDelete: SetNull, map: "fk_app_user")
   jobId       String
-  job         Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  job         Job      @relation(fields: [jobId], references: [id], onDelete: Cascade, map: "fk_app_job")
   
   fullName    String
   phone       String?
@@ -84,13 +104,11 @@ model Application {
   cvUrl       String?  
   cvText      String?  @db.LongText
   
-  // Workflow
   status      String   @default("NEW") 
   interviewStage Int   @default(0)     
   isFavorite  Boolean  @default(false)
   interviewDate DateTime? 
 
-  // NEW: Dynamic Values linking to ChecklistTemplate
   checklistValues ChecklistValue[]
 
   comments    Comment[]
@@ -101,18 +119,18 @@ model Application {
   @@index([jobId])
 }
 
-// NEW: Stores the actual values for a specific candidate
 model ChecklistValue {
   id          String   @id @default(cuid())
-  applicationId String
-  application   Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
   
-  templateId    String   // Links to ChecklistTemplate.id
-  value         String?  @db.Text // Stores "12345" or "true" or "2023-01-01"
-
+  applicationId String
+  // FIX: Explicit map name to solve the "Duplicate foreign key" error
+  application   Application @relation(fields: [applicationId], references: [id], onDelete: Cascade, map: "fk_checklist_app")
+  
+  templateId    String   
+  value         String?  @db.Text 
   updatedAt     DateTime @updatedAt
   
-  @@unique([applicationId, templateId]) // One value per template per app
+  @@unique([applicationId, templateId])
 }
 
 model Comment {
@@ -120,8 +138,8 @@ model Comment {
   text          String   @db.Text
   createdAt     DateTime @default(now())
   userId        String
-  user          User     @relation(fields: [userId], references: [id])
+  user          User     @relation(fields: [userId], references: [id], map: "fk_comment_user")
   applicationId String
-  application   Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  application   Application @relation(fields: [applicationId], references: [id], onDelete: Cascade, map: "fk_comment_app")
   @@index([applicationId])
 }

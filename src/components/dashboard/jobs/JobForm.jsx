@@ -12,7 +12,7 @@ export default function JobForm({ initialData, plantels, jobTitles = [], isEdit 
   const router = useRouter();
   const [loading, setLoading] = useState(false);
 
-  // --- AUTOCOMPLETE STATE ---
+  // AutoComplete State
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedPuesto, setSelectedPuesto] = useState(
     initialData?.jobTitleId 
@@ -22,17 +22,14 @@ export default function JobForm({ initialData, plantels, jobTitles = [], isEdit 
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const dropdownRef = useRef(null);
 
-  // Initialize search term if editing
   useEffect(() => {
       if (selectedPuesto) setSearchTerm(selectedPuesto.name);
   }, [selectedPuesto]);
 
-  // Close dropdown when clicking outside
   useEffect(() => {
       const handleClickOutside = (event) => {
           if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
               setIsDropdownOpen(false);
-              // Revert search term to selected if user didn't pick
               if (selectedPuesto) setSearchTerm(selectedPuesto.name);
               else setSearchTerm('');
           }
@@ -41,7 +38,6 @@ export default function JobForm({ initialData, plantels, jobTitles = [], isEdit 
       return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [selectedPuesto]);
 
-  // Filter Logic
   const filteredPuestos = useMemo(() => {
       if (!searchTerm) return jobTitles.filter(t => t.isActive);
       return jobTitles.filter(t => 
@@ -62,7 +58,6 @@ export default function JobForm({ initialData, plantels, jobTitles = [], isEdit 
       setIsDropdownOpen(true);
   };
 
-  // --- SUBMIT HANDLER ---
   async function handleSubmit(formData) {
     if (!selectedPuesto) {
         toast.error("Debes seleccionar un Puesto del catálogo.");
@@ -70,8 +65,6 @@ export default function JobForm({ initialData, plantels, jobTitles = [], isEdit 
     }
 
     setLoading(true);
-    
-    // Inject the ID. The server will fetch the name to ensure consistency.
     formData.set('jobTitleId', selectedPuesto.id);
 
     let res;
@@ -111,7 +104,7 @@ export default function JobForm({ initialData, plantels, jobTitles = [], isEdit 
             <form action={handleSubmit} className="space-y-6">
                 {isEdit && <input type="hidden" name="jobId" value={initialData.id} />}
                 
-                {/* --- SEARCHABLE PUESTO SELECTOR --- */}
+                {/* SEARCHABLE PUESTO */}
                 <div className="col-span-2 relative" ref={dropdownRef}>
                     <label className="block text-xs font-bold text-slate-500 uppercase mb-2">
                         Puesto (Obligatorio) <span className="text-red-500">*</span>
@@ -124,12 +117,12 @@ export default function JobForm({ initialData, plantels, jobTitles = [], isEdit 
                         
                         <input 
                             type="text"
-                            placeholder="Buscar puesto (ej. Docente, Vigilante...)"
+                            placeholder="Buscar puesto..."
                             value={searchTerm}
                             onChange={(e) => {
                                 setSearchTerm(e.target.value);
                                 setIsDropdownOpen(true);
-                                if(selectedPuesto) setSelectedPuesto(null); // Clear selection if typing
+                                if(selectedPuesto) setSelectedPuesto(null);
                             }}
                             onFocus={() => setIsDropdownOpen(true)}
                             className={`w-full pl-10 pr-10 p-3 border rounded-lg outline-none transition font-medium
@@ -154,7 +147,6 @@ export default function JobForm({ initialData, plantels, jobTitles = [], isEdit 
                         )}
                     </div>
 
-                    {/* DROPDOWN LIST */}
                     {isDropdownOpen && (
                         <div className="absolute z-50 w-full mt-2 bg-white rounded-xl border border-slate-200 shadow-xl max-h-60 overflow-y-auto animate-in fade-in slide-in-from-top-2">
                             {filteredPuestos.length === 0 ? (
@@ -206,7 +198,25 @@ export default function JobForm({ initialData, plantels, jobTitles = [], isEdit 
                             ))}
                         </select>
                     </div>
+                    
+                    {/* FIXED: MISSING JOB TYPE INPUT */}
                     <div>
+                        <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Tipo de Contrato</label>
+                        <select 
+                            name="type" 
+                            defaultValue={initialData?.type || 'Tiempo Completo'} 
+                            className="w-full border border-slate-300 p-3 rounded-lg bg-white outline-none focus:border-blue-500 transition cursor-pointer"
+                        >
+                            <option value="Tiempo Completo">Tiempo Completo</option>
+                            <option value="Medio Tiempo">Medio Tiempo</option>
+                            <option value="Por Horas">Por Horas / Asignatura</option>
+                            <option value="Temporal">Temporal / Proyecto</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                     <div>
                         <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Departamento</label>
                         <input 
                             name="department" 
@@ -215,10 +225,7 @@ export default function JobForm({ initialData, plantels, jobTitles = [], isEdit 
                             placeholder="Ej. Control Escolar"
                             className="w-full border border-slate-300 p-3 rounded-lg outline-none focus:border-blue-500 transition" 
                         />
-                    </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                     </div>
                      <div>
                         <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Estado</label>
                         <select 
@@ -231,15 +238,16 @@ export default function JobForm({ initialData, plantels, jobTitles = [], isEdit 
                             <option value="CLOSED">🔴 Cerrada</option>
                         </select>
                      </div>
-                     <div>
-                        <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Fecha Límite</label>
-                        <input 
-                            type="date" 
-                            name="closingDate" 
-                            defaultValue={dateValue}
-                            className="w-full border border-slate-300 p-3 rounded-lg outline-none focus:border-blue-500 transition text-slate-600" 
-                        />
-                     </div>
+                </div>
+
+                <div>
+                     <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Fecha Límite (Opcional)</label>
+                     <input 
+                        type="date" 
+                        name="closingDate" 
+                        defaultValue={dateValue}
+                        className="w-full border border-slate-300 p-3 rounded-lg outline-none focus:border-blue-500 transition text-slate-600" 
+                     />
                 </div>
 
                 <div>

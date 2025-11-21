@@ -2,9 +2,10 @@
 'use client';
 import Link from 'next/link';
 import { useSession, signIn, signOut } from 'next-auth/react';
-import { Globe, LogIn, LogOut, LayoutDashboard, UserCircle } from 'lucide-react';
+import { Globe, LogIn, LogOut, LayoutDashboard } from 'lucide-react';
 import { setCookie, getCookie } from 'cookies-next';
 import { useEffect, useState } from 'react';
+import { PERMISSIONS } from '@/lib/permissions'; // Ensure this import exists
 
 export default function Header() {
   const { data: session, status } = useSession();
@@ -27,13 +28,8 @@ export default function Header() {
     window.location.reload();
   };
 
-  const handleLogout = async () => {
-    await signOut({ callbackUrl: '/' });
-  };
-
-  // 1. Define Roles that can see the Panel
-  const ADMIN_ROLES = ['ADMIN', 'RH', 'DIRECTOR'];
-  const isAuthorized = session && ADMIN_ROLES.includes(session.user.role);
+  // CHECK PERMISSION instead of Role String
+  const canViewDashboard = session?.user?.permissions?.includes(PERMISSIONS.VIEW_DASHBOARD) || session?.user?.isGlobal;
 
   return (
     <header className="sticky top-0 z-50 w-full border-b border-white/10 bg-white/80 backdrop-blur-md shadow-sm">
@@ -62,22 +58,15 @@ export default function Header() {
           ) : session ? (
             <div className="flex items-center gap-3 pl-3 border-l border-slate-200">
               
-              {/* STRICT CHECK: Only render Panel link if authorized */}
-              {isAuthorized && (
+              {/* SHOW PANEL BUTTON IF AUTHORIZED */}
+              {canViewDashboard && (
                 <Link href="/dashboard" className="flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 transition-all">
                     <LayoutDashboard size={14} /> <span className="hidden sm:inline">Panel</span>
                 </Link>
               )}
-
-              {/* Candidates see their portal */}
-              {session.user.role === 'CANDIDATE' && (
-                <Link href="/my-applications" className="flex items-center gap-2 text-sm font-bold text-slate-600 hover:text-blue-600">
-                   <UserCircle size={18} /> <span className="hidden sm:inline">Mis Postulaciones</span>
-                </Link>
-              )}
               
               <button 
-                onClick={handleLogout}
+                onClick={() => signOut({ callbackUrl: '/' })}
                 className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-full transition-all"
                 title="Cerrar Sesión"
               >
@@ -89,12 +78,12 @@ export default function Header() {
               )}
             </div>
           ) : (
-            // OUTSIDERS SEE THIS ONLY
+            // STAFF LOGIN ONLY
             <button 
               onClick={() => signIn("google")}
-              className="flex items-center gap-2 rounded-lg bg-blue-600 px-5 py-2 text-sm font-bold text-white shadow-lg shadow-blue-200 transition hover:bg-blue-700 hover:-translate-y-0.5"
+              className="flex items-center gap-2 rounded-lg bg-slate-900 px-5 py-2 text-sm font-bold text-white shadow-lg shadow-slate-200 transition hover:bg-blue-700 hover:-translate-y-0.5"
             >
-              <LogIn size={16} /> <span className="hidden sm:inline">Acceso Personal</span>
+              <LogIn size={16} /> <span className="hidden sm:inline">Acceso Staff</span>
             </button>
           )}
         </div>
