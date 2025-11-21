@@ -1,12 +1,12 @@
 // --- src\app\dashboard\application\[id]\page.js ---
 import { db } from '@/lib/db';
 import { auth } from '@/auth';
-import { updateApplicationStatus } from '@/actions/job-actions';
-import ProcessControl from '@/components/dashboard/ProcessControl';
 import Timeline from '@/components/dashboard/Timeline';
-import StatusManager from '@/components/dashboard/StatusManager'; // NEW
-import FavoriteButton from '@/components/dashboard/FavoriteButton'; // NEW
-import { ArrowLeft, Download, FileText, Mail, Phone, Shield } from 'lucide-react';
+import StatusManager from '@/components/dashboard/StatusManager'; 
+import FavoriteButton from '@/components/dashboard/FavoriteButton'; 
+import InterviewScheduler from '@/components/dashboard/InterviewScheduler'; 
+import DynamicChecklist from '@/components/dashboard/DynamicChecklist'; // NEW
+import { ArrowLeft, Download, FileText, Mail, Phone } from 'lucide-react';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 
@@ -14,17 +14,24 @@ export default async function ApplicationDetail({ params }) {
   const session = await auth();
   if (!session) redirect('/');
 
-  // Fetch Application
+  // Fetch App with Checklist Values
   const app = await db.application.findUnique({
     where: { id: params.id },
     include: { 
         job: true, 
         user: true,
+        checklistValues: true, // Fetch saved values
         comments: {
             include: { user: true },
             orderBy: { createdAt: 'asc' }
         }
     }
+  });
+
+  // Fetch Checklist Configuration (Templates)
+  const templates = await db.checklistTemplate.findMany({
+      where: { isActive: true },
+      orderBy: { createdAt: 'asc' }
   });
 
   if (!app) return <div className="p-8 text-center">Aplicación no encontrada</div>;
@@ -44,7 +51,7 @@ export default async function ApplicationDetail({ params }) {
                 <div className="flex items-center gap-2 text-xs text-slate-500">
                     <span className="font-bold text-blue-600">{app.job.title}</span>
                     <span>•</span>
-                    <span>{app.job.plantel?.name || 'Plantel'}</span>
+                    <span>{app.job.plantel?.name}</span>
                 </div>
             </div>
         </div>
@@ -59,7 +66,7 @@ export default async function ApplicationDetail({ params }) {
       </div>
 
       <div className="flex flex-1 overflow-hidden">
-        {/* LEFT: PDF Viewer */}
+        {/* LEFT: PDF */}
         <div className="flex-1 bg-slate-200 p-4 overflow-hidden relative flex flex-col">
              {app.cvUrl ? (
                  <div className="flex-1 rounded-xl shadow-inner bg-white overflow-hidden border border-slate-300">
@@ -80,12 +87,11 @@ export default async function ApplicationDetail({ params }) {
              )}
         </div>
 
-        {/* RIGHT: Controls & Timeline */}
+        {/* RIGHT: Modules */}
         <div className="w-[400px] bg-white border-l border-gray-200 overflow-y-auto flex flex-col shadow-xl z-20">
             
-            {/* 1. Contact Info */}
             <div className="p-6 border-b border-slate-100">
-                <h3 className="font-bold text-slate-800 mb-4">Información de Contacto</h3>
+                <h3 className="font-bold text-slate-800 mb-4">Contacto</h3>
                 <div className="space-y-3 text-sm">
                     <div className="flex items-center gap-3 p-2 rounded-lg bg-slate-50 text-slate-700">
                         <Mail size={16} className="text-blue-500" />
@@ -98,50 +104,22 @@ export default async function ApplicationDetail({ params }) {
                 </div>
             </div>
 
-            {/* 2. Process Control (Stages) */}
-            <div className="p-6 border-b border-slate-100">
-                 <ProcessControl 
+            <div className="p-6 pb-0 bg-slate-50">
+                 <InterviewScheduler 
                     applicationId={app.id} 
-                    currentStage={app.interviewStage} 
-                    currentStatus={app.status}
-                />
+                    initialDate={app.interviewDate} 
+                    status={app.status}
+                 />
+                 
+                 {/* DYNAMIC CHECKLIST MODULE */}
+                 <DynamicChecklist 
+                    applicationId={app.id} 
+                    templates={templates} 
+                    existingValues={app.checklistValues}
+                 />
             </div>
 
-            {/* 3. Tracking IDs */}
-            <div className="p-6 border-b border-slate-100 bg-indigo-50/30">
-                 <h3 className="font-bold text-indigo-900 text-sm mb-3 flex items-center gap-2">
-                    <Shield size={14}/> IDs de Sistema
-                 </h3>
-                 <form action={async (fd) => {
-                    'use server';
-                    await updateApplicationStatus(app.id, {
-                        signiaId: fd.get('signiaId'),
-                        evaId: fd.get('evaId'),
-                        pathId: fd.get('pathId')
-                    });
-                 }} className="space-y-3">
-                    <div className="grid grid-cols-3 gap-2">
-                        <div>
-                            <label className="text-[10px] font-bold text-indigo-600 block mb-1">Signia</label>
-                            <input name="signiaId" defaultValue={app.signiaId} className="w-full px-2 py-1 text-xs border border-indigo-200 rounded focus:outline-none focus:border-indigo-500" />
-                        </div>
-                        <div>
-                            <label className="text-[10px] font-bold text-indigo-600 block mb-1">Eva</label>
-                            <input name="evaId" defaultValue={app.evaId} className="w-full px-2 py-1 text-xs border border-indigo-200 rounded focus:outline-none focus:border-indigo-500" />
-                        </div>
-                        <div>
-                            <label className="text-[10px] font-bold text-indigo-600 block mb-1">Path</label>
-                            <input name="pathId" defaultValue={app.pathId} className="w-full px-2 py-1 text-xs border border-indigo-200 rounded focus:outline-none focus:border-indigo-500" />
-                        </div>
-                    </div>
-                    <button className="w-full py-1.5 bg-indigo-600 text-white text-xs font-bold rounded hover:bg-indigo-700 transition">
-                        Guardar IDs
-                    </button>
-                 </form>
-            </div>
-
-            {/* 4. Timeline */}
-            <div className="flex-1 p-6 bg-slate-50">
+            <div className="flex-1 p-6 pt-2 bg-slate-50">
                 <Timeline 
                     applicationId={app.id} 
                     comments={app.comments} 
@@ -149,9 +127,7 @@ export default async function ApplicationDetail({ params }) {
                 />
             </div>
 
-            {/* 5. Status Manager (Replaced hardcoded form) */}
             <StatusManager applicationId={app.id} currentStatus={app.status} />
-
         </div>
       </div>
     </div>

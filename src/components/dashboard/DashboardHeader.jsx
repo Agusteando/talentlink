@@ -2,32 +2,39 @@
 'use client';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, Briefcase, Users, MapPin, LogOut, ExternalLink } from 'lucide-react';
+import { 
+    LayoutDashboard, 
+    Briefcase, 
+    LogOut, 
+    ExternalLink, 
+    CalendarDays, 
+    Columns, 
+    Settings
+} from 'lucide-react';
 import { signOut } from 'next-auth/react';
 
 export default function DashboardHeader({ user }) {
   const pathname = usePathname();
-
-  const isActive = (path) => pathname === path || pathname.startsWith(`${path}/`);
+  const isActive = (path) => pathname === path;
 
   const navItems = [
-    { href: '/dashboard', label: 'Candidatos', icon: LayoutDashboard, roles: ['ADMIN', 'RH', 'DIRECTOR'] },
+    { href: '/dashboard', label: 'Lista', icon: LayoutDashboard, roles: ['ADMIN', 'RH', 'DIRECTOR'] },
+    { href: '/dashboard/kanban', label: 'Tablero', icon: Columns, roles: ['ADMIN', 'RH', 'DIRECTOR'] },
+    { href: '/dashboard/calendar', label: 'Agenda', icon: CalendarDays, roles: ['ADMIN', 'RH', 'DIRECTOR'] },
     { href: '/dashboard/jobs', label: 'Vacantes', icon: Briefcase, roles: ['ADMIN', 'DIRECTOR'] },
-    { href: '/dashboard/plantels', label: 'Planteles', icon: MapPin, roles: ['ADMIN'] },
-    { href: '/dashboard/users', label: 'Usuarios', icon: Users, roles: ['ADMIN'] },
   ];
 
   return (
     <header className="bg-white border-b border-slate-200 sticky top-0 z-30">
-      <div className="container mx-auto px-6 h-16 flex items-center justify-between">
-        <div className="flex items-center gap-8">
-            {/* Brand Logo */}
-            <div className="flex items-center gap-3">
+      <div className="container mx-auto px-4 h-16 flex items-center justify-between">
+        <div className="flex items-center gap-6">
+            {/* Brand */}
+            <div className="flex items-center gap-2">
                  <div className="h-8 w-8 bg-slate-900 text-white rounded-lg flex items-center justify-center font-bold text-lg">T</div>
-                 <span className="font-bold text-slate-800 hidden md:block">TalentLink <span className="text-slate-400 font-normal">| Panel</span></span>
+                 <span className="font-bold text-slate-800 hidden lg:block">TalentLink</span>
             </div>
 
-            {/* Navigation */}
+            {/* Main Navigation */}
             <nav className="hidden md:flex items-center gap-1">
                 {navItems.map((item) => {
                     if (!item.roles.includes(user.role)) return null;
@@ -48,12 +55,23 @@ export default function DashboardHeader({ user }) {
         </div>
 
         <div className="flex items-center gap-3">
-            <div className="text-right hidden sm:block">
+            <div className="text-right hidden sm:block leading-tight">
                 <div className="text-xs font-bold text-slate-900">{user.name}</div>
-                <div className="text-[10px] text-slate-500 uppercase">{user.role} • {user.plantelName || 'Global'}</div>
+                <div className="text-[10px] text-slate-500 uppercase">{user.role}</div>
             </div>
             
-            <div className="h-8 w-px bg-slate-200 mx-2"></div>
+            <div className="h-6 w-px bg-slate-200 mx-1"></div>
+
+            {/* ADMIN SETTINGS ENTRY POINT */}
+            {user.role === 'ADMIN' && (
+                <Link 
+                    href="/dashboard/settings" 
+                    className={`p-2 rounded-lg transition ${isActive('/dashboard/settings') ? 'bg-slate-100 text-slate-900' : 'text-slate-400 hover:text-blue-600 hover:bg-slate-50'}`}
+                    title="Configuración Global"
+                >
+                    <Settings size={18} />
+                </Link>
+            )}
 
             <Link href="/" target="_blank" className="p-2 text-slate-400 hover:text-blue-600 transition" title="Ver Sitio Público">
                 <ExternalLink size={18} />

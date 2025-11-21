@@ -16,21 +16,27 @@ model Plantel {
   lat         Float?
   lng         Float?
   isActive    Boolean  @default(true)
-  
   jobs        Job[]
   users       User[]   
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 }
 
-// NEW: Standardized Job Titles (Puestos)
 model JobTitle {
   id        String   @id @default(cuid())
-  name      String   @unique // e.g. "Docente", "Intendencia"
-  category  String?  // e.g. "Academico", "Administrativo"
+  name      String   @unique 
+  category  String?  
   isActive  Boolean  @default(true)
-  
   jobs      Job[]
+}
+
+// NEW: Dynamic Checklist Configuration (Admin defines these)
+model ChecklistTemplate {
+  id        String   @id @default(cuid())
+  name      String   // e.g. "Signia ID", "Entrevista Técnica", "Examen Médico"
+  type      String   @default("TEXT") // TEXT, CHECKBOX, DATE
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
 }
 
 model User {
@@ -40,10 +46,8 @@ model User {
   emailVerified   DateTime?
   image           String?
   role            String    @default("CANDIDATE") 
-  
   plantelId       String?
   plantel         Plantel?  @relation(fields: [plantelId], references: [id])
-  
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
   applications    Application[]
@@ -52,23 +56,16 @@ model User {
 
 model Job {
   id          String   @id @default(cuid())
-  
-  // REVISED: Link to JobTitle instead of free text
-  // We keep 'title' as a snapshot string in case the Puesto is deleted later, 
-  // but we prioritize the relation.
   title       String   
   jobTitleId  String?
   jobTitle    JobTitle? @relation(fields: [jobTitleId], references: [id])
-
   description String   @db.Text
   department  String
   type        String   @default("Tiempo Completo")
   status      String   @default("OPEN") 
   closingDate DateTime?
-  
   plantelId   String
   plantel     Plantel @relation(fields: [plantelId], references: [id])
-  
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   applications Application[]
@@ -76,10 +73,8 @@ model Job {
 
 model Application {
   id          String   @id @default(cuid())
-  
   userId      String?
   user        User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
-  
   jobId       String
   job         Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
   
@@ -89,22 +84,35 @@ model Application {
   cvUrl       String?  
   cvText      String?  @db.LongText
   
-  signiaId    String?
-  evaId       String?
-  pathId      String?
-  
-  // Statuses: NEW, INTERVIEW, TALENT_POOL, HIRED, REJECTED
+  // Workflow
   status      String   @default("NEW") 
   interviewStage Int   @default(0)     
   isFavorite  Boolean  @default(false)
+  interviewDate DateTime? 
+
+  // NEW: Dynamic Values linking to ChecklistTemplate
+  checklistValues ChecklistValue[]
 
   comments    Comment[]
-
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt 
   
   @@index([userId])
   @@index([jobId])
+}
+
+// NEW: Stores the actual values for a specific candidate
+model ChecklistValue {
+  id          String   @id @default(cuid())
+  applicationId String
+  application   Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  
+  templateId    String   // Links to ChecklistTemplate.id
+  value         String?  @db.Text // Stores "12345" or "true" or "2023-01-01"
+
+  updatedAt     DateTime @updatedAt
+  
+  @@unique([applicationId, templateId]) // One value per template per app
 }
 
 model Comment {
@@ -115,6 +123,5 @@ model Comment {
   user          User     @relation(fields: [userId], references: [id])
   applicationId String
   application   Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
-
   @@index([applicationId])
 }
