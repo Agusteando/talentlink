@@ -9,10 +9,10 @@ import {
   LogOut,
   ChevronLeft,
   ChevronRight,
-  FileText,
   MoreHorizontal,
   PlusCircle,
-  Clock
+  Clock,
+  Star
 } from 'lucide-react';
 import { signOut } from '@/auth';
 import ExportButton from '@/components/dashboard/ExportButton';
@@ -33,25 +33,25 @@ export default async function Dashboard({ searchParams }) {
   if (!session || session.user.role === 'CANDIDATE') redirect('/my-applications');
 
   const query = searchParams?.query || '';
+  const showFavorites = searchParams?.filter === 'favorites'; // NEW FILTER
   const currentPage = Number(searchParams?.page) || 1;
   const itemsPerPage = 10; 
   const skip = (currentPage - 1) * itemsPerPage;
 
-  // --- FIX: Dynamic Relation Filtering ---
   let whereClause = {
     AND: []
   };
 
+  // Role Filtering
   if (session.user.role === 'DIRECTOR') {
-      // If Director has a specific Plantel ID assigned in the DB
       if (session.user.plantelId) {
         whereClause.AND.push({ job: { plantelId: session.user.plantelId } });
       } else {
-        // Safety fallback: If role is director but no plantel assigned, show nothing to prevent data leak
         whereClause.AND.push({ id: 'none' }); 
       }
   }
 
+  // Search Filtering
   if (query) {
       whereClause.AND.push({
         OR: [
@@ -62,10 +62,20 @@ export default async function Dashboard({ searchParams }) {
       });
   }
 
+  // Favorites Filtering
+  if (showFavorites) {
+      whereClause.AND.push({
+          OR: [
+              { isFavorite: true },
+              { status: 'TALENT_POOL' }
+          ]
+      });
+  }
+
   const [applications, totalCount, allAppsForStats] = await Promise.all([
     db.application.findMany({
         where: whereClause,
-        include: { job: { include: { plantel: true } }, user: true }, // Include Plantel name
+        include: { job: { include: { plantel: true } }, user: true },
         orderBy: { createdAt: 'desc' },
         take: itemsPerPage,
         skip: skip
@@ -73,16 +83,15 @@ export default async function Dashboard({ searchParams }) {
     db.application.count({ where: whereClause }),
     db.application.findMany({
         where: whereClause,
-        select: { status: true, createdAt: true }
+        select: { status: true, createdAt: true, isFavorite: true }
     })
   ]);
 
   const totalPages = Math.ceil(totalCount / itemsPerPage);
-
   const totalAppsStat = allAppsForStats.length;
   const interviewApps = allAppsForStats.filter(a => a.status === 'INTERVIEW').length;
   const hiredApps = allAppsForStats.filter(a => a.status === 'HIRED').length;
-  const newApps = allAppsForStats.filter(a => isNew(a.createdAt)).length;
+  const poolApps = allAppsForStats.filter(a => a.isFavorite || a.status === 'TALENT_POOL').length;
 
   return (
     <div className="min-h-screen bg-slate-50/50">
@@ -97,7 +106,6 @@ export default async function Dashboard({ searchParams }) {
               <div className="flex items-center gap-2 text-xs font-medium text-slate-500">
                  <span className="uppercase tracking-wider">{session.user.role}</span>
                  <span className="h-1 w-1 rounded-full bg-slate-300"></span>
-                 {/* Display Dynamic Plantel Name */}
                  <span>{session.user.role === 'DIRECTOR' ? (session.user.plantelName || 'Sin Asignar') : 'Vista Global'}</span>
               </div>
             </div>
@@ -106,7 +114,6 @@ export default async function Dashboard({ searchParams }) {
           <div className="flex items-center gap-3">
             {session.user.role === 'ADMIN' && (
                 <>
-                    {/* NAV FIX: Link to Planteles */}
                     <Link href="/dashboard/plantels" className="hidden md:flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50 transition-all">
                         <Users size={16} /> <span>Planteles</span>
                     </Link>
@@ -130,16 +137,13 @@ export default async function Dashboard({ searchParams }) {
         </div>
       </header>
 
-      {/* ... (Main Stats and Table Content remains similar, just ensuring data rendering is safe) ... */}
       <main className="mx-auto max-w-7xl px-6 py-8">
         {/* Stats */}
         <div className="mb-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-          {/* ... Same Stats Cards ... */}
            <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
             <p className="text-sm font-bold text-slate-400 uppercase tracking-wide">Candidatos</p>
             <div className="flex justify-between items-end">
                 <h3 className="mt-2 text-3xl font-extrabold text-slate-900">{totalAppsStat}</h3>
-                {newApps > 0 && <span className="text-xs font-bold text-green-600 bg-green-50 px-2 py-1 rounded-full">+{newApps} nuevos</span>}
             </div>
           </div>
           <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
@@ -147,8 +151,8 @@ export default async function Dashboard({ searchParams }) {
             <h3 className="mt-2 text-3xl font-extrabold text-blue-700">{interviewApps}</h3>
           </div>
           <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
-            <p className="text-sm font-bold text-green-500 uppercase tracking-wide">Contratados</p>
-            <h3 className="mt-2 text-3xl font-extrabold text-green-700">{hiredApps}</h3>
+            <p className="text-sm font-bold text-purple-500 uppercase tracking-wide">Cartera / Pool</p>
+            <h3 className="mt-2 text-3xl font-extrabold text-purple-700">{poolApps}</h3>
           </div>
           <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm flex flex-col justify-center items-center">
              <ExportButton applications={applications} />
@@ -158,11 +162,25 @@ export default async function Dashboard({ searchParams }) {
         {/* Table */}
         <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
            <div className="border-b border-slate-100 bg-white px-6 py-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-             <div>
-                <h3 className="text-lg font-bold text-slate-800">Base de Talento</h3>
-                <p className="text-sm text-slate-400">
-                    Página {currentPage} de {totalPages} • Total: {totalCount}
-                </p>
+             <div className="flex items-center gap-4">
+                <div>
+                    <h3 className="text-lg font-bold text-slate-800">Base de Talento</h3>
+                    <p className="text-sm text-slate-400">
+                        {showFavorites ? 'Mostrando solo favoritos' : 'Mostrando todos los candidatos'}
+                    </p>
+                </div>
+                
+                {/* Favorites Toggle */}
+                <Link 
+                    href={showFavorites ? '/dashboard' : '/dashboard?filter=favorites'}
+                    className={`px-3 py-1.5 rounded-full text-xs font-bold flex items-center gap-2 border transition
+                    ${showFavorites 
+                        ? 'bg-amber-50 text-amber-600 border-amber-200' 
+                        : 'bg-white text-slate-500 border-slate-200 hover:border-amber-300 hover:text-amber-500'}`}
+                >
+                    <Star size={14} fill={showFavorites ? "currentColor" : "none"} />
+                    Cartera
+                </Link>
              </div>
              <SearchInput placeholder="Buscar candidato..." />
           </div>
@@ -192,9 +210,9 @@ export default async function Dashboard({ searchParams }) {
                             <div>
                                 <div className="font-bold text-slate-900 flex items-center gap-2">
                                     {app.fullName}
+                                    {app.isFavorite && <Star size={12} className="text-amber-400 fill-amber-400"/>}
                                     {isNew(app.createdAt) && <span className="bg-red-100 text-red-700 text-[9px] px-1.5 py-0.5 rounded font-bold">NUEVO</span>}
                                 </div>
-                                {/* Use contact email from app directly for guests */}
                                 <div className="text-xs text-slate-500">{app.email || app.user?.email}</div>
                             </div>
                         </div>
@@ -218,8 +236,10 @@ export default async function Dashboard({ searchParams }) {
                           ${app.status === 'NEW' ? 'bg-slate-100 text-slate-600 border-slate-200' : 
                             app.status === 'HIRED' ? 'bg-emerald-100 text-emerald-700 border-emerald-200' : 
                             app.status === 'INTERVIEW' ? 'bg-indigo-100 text-indigo-700 border-indigo-200' : 
+                            app.status === 'TALENT_POOL' ? 'bg-purple-100 text-purple-700 border-purple-200' : 
                             'bg-red-50 text-red-600 border-red-100'}`}>
-                          {app.status === 'NEW' ? 'En Revisión' : app.status}
+                          {app.status === 'NEW' ? 'En Revisión' : 
+                           app.status === 'TALENT_POOL' ? 'En Cartera' : app.status}
                         </span>
                       </td>
                       <td className="px-6 py-4 text-right">
@@ -234,12 +254,11 @@ export default async function Dashboard({ searchParams }) {
             </table>
           </div>
           
-          {/* Pagination (Same logic) */}
           <div className="border-t border-slate-100 bg-slate-50 p-4 flex items-center justify-between">
-             <Link href={`/dashboard?page=${currentPage > 1 ? currentPage - 1 : 1}&query=${query}`} className={`flex items-center gap-1 text-sm font-bold px-3 py-2 rounded-lg transition ${currentPage <= 1 ? 'text-slate-300 pointer-events-none' : 'text-slate-600 hover:bg-white hover:shadow-sm'}`}>
+             <Link href={`/dashboard?page=${currentPage > 1 ? currentPage - 1 : 1}&query=${query}&filter=${showFavorites ? 'favorites' : ''}`} className={`flex items-center gap-1 text-sm font-bold px-3 py-2 rounded-lg transition ${currentPage <= 1 ? 'text-slate-300 pointer-events-none' : 'text-slate-600 hover:bg-white hover:shadow-sm'}`}>
                 <ChevronLeft size={16} /> Anterior
              </Link>
-             <Link href={`/dashboard?page=${currentPage < totalPages ? currentPage + 1 : totalPages}&query=${query}`} className={`flex items-center gap-1 text-sm font-bold px-3 py-2 rounded-lg transition ${currentPage >= totalPages ? 'text-slate-300 pointer-events-none' : 'text-slate-600 hover:bg-white hover:shadow-sm'}`}>
+             <Link href={`/dashboard?page=${currentPage < totalPages ? currentPage + 1 : totalPages}&query=${query}&filter=${showFavorites ? 'favorites' : ''}`} className={`flex items-center gap-1 text-sm font-bold px-3 py-2 rounded-lg transition ${currentPage >= totalPages ? 'text-slate-300 pointer-events-none' : 'text-slate-600 hover:bg-white hover:shadow-sm'}`}>
                 Siguiente <ChevronRight size={16} />
              </Link>
           </div>

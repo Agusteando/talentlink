@@ -1,45 +1,133 @@
-// --- prisma/seed.js ---
+// prisma/seed.js
 const { PrismaClient } = require('@prisma/client');
-
 const prisma = new PrismaClient();
 
 const planteles = [
-  { code: 'PM', name: 'Plantel Morelos', address: 'Av. Morelos #123, Ecatepec', lat: 19.609, lng: -99.060 },
-  { code: 'PT', name: 'Plantel Tecnológico', address: 'Av. Central #45, Ecatepec', lat: 19.532, lng: -99.035 },
-  { code: 'SM', name: 'Secundaria Morelos', address: 'Calle Benito Juárez #10, Coacalco', lat: 19.628, lng: -99.092 },
-  { code: 'ST', name: 'Secundaria Tecnológico', address: 'Vía López Portillo #55, Coacalco', lat: 19.615, lng: -99.110 },
-  { code: 'PREET', name: 'Preescolar Ecatepec', address: 'Calle Agricultura #8, Ecatepec', lat: 19.600, lng: -99.050 },
-  { code: 'PREEM', name: 'Preescolar Morelos', address: 'Av. Revolución #22, Ecatepec', lat: 19.590, lng: -99.040 },
-  { code: 'ISM', name: 'Instituto Superior Morelos', address: 'Av. Insurgentes #99, CDMX', lat: 19.432, lng: -99.133 },
-  { code: 'IS', name: 'Instituto Superior', address: 'Campus Central, CDMX', lat: 19.420, lng: -99.150 },
-  { code: 'CT', name: 'Campus Tulpetlac', address: 'Vía Morelos km 18, Tulpetlac', lat: 19.560, lng: -99.070 },
-  { code: 'CM', name: 'Campus Monterrey', address: 'Calle Real #5, Monterrey', lat: 25.686, lng: -100.316 },
-  { code: 'DM', name: 'Dirección General', address: 'Oficinas Centrales', lat: 19.400, lng: -99.100 },
-  { code: 'CO', name: 'Campus Coacalco', address: 'Eje 8 #33, Coacalco', lat: 19.630, lng: -99.100 },
+  {
+    code: 'PREET',
+    name: 'Preescolar Casita del Saber – IEDIS Campus Toluca',
+    address:
+      'Calle España 8, Col. Las Verdolagas, San Mateo Oxtotitlán, 50100 Toluca, Estado de México',
+    lat: 19.293653,
+    lng: -99.69226,
+  },
+  {
+    code: 'PT',
+    name: 'Primaria Casita del Saber – IEDIS Campus Toluca',
+    address:
+      'Calle España 8, Col. Las Verdolagas, San Mateo Oxtotitlán, 50100 Toluca, Estado de México',
+    lat: 19.293653,
+    lng: -99.69226,
+  },
+  {
+    code: 'ST',
+    name: 'Secundaria Casita del Saber – IEDIS Campus Toluca',
+    address:
+      'Calle España 8, Col. Las Verdolagas, San Mateo Oxtotitlán, 50100 Toluca, Estado de México',
+    lat: 19.293653,
+    lng: -99.69226,
+  },
+  {
+    code: 'CT',
+    name: 'Casita del Saber – IEDIS Campus Toluca',
+    address:
+      'Calle España 8, Col. Las Verdolagas, San Mateo Oxtotitlán, 50100 Toluca, Estado de México',
+    lat: 19.293653,
+    lng: -99.69226,
+  },
+  {
+    code: 'PREEM',
+    name: 'Preescolar Casita del Saber – IEDIS Campus Metepec',
+    address:
+      'Av. 5 532, Col. San José La Pilita, 52149 Metepec, Estado de México',
+    lat: 19.25877,
+    lng: -99.58566,
+  },
+  {
+    code: 'PM',
+    name: 'Primaria Casita del Saber – IEDIS Campus Metepec',
+    address:
+      'Av. 5 532, Col. San José La Pilita, 52149 Metepec, Estado de México',
+    lat: 19.25877,
+    lng: -99.58566,
+  },
+  {
+    code: 'SM',
+    name: 'Secundaria Casita del Saber – IEDIS Campus Metepec',
+    address:
+      'Av. 5 532, Col. San José La Pilita, 52149 Metepec, Estado de México',
+    lat: 19.25877,
+    lng: -99.58566,
+  },
+  {
+    code: 'CM',
+    name: 'Casita del Saber – IEDIS Campus Metepec',
+    address:
+      'Av. 5 532, Col. San José La Pilita, 52149 Metepec, Estado de México',
+    lat: 19.25877,
+    lng: -99.58566,
+  },
+  {
+    code: 'DM',
+    name: 'IEDIS Guardería y Desarrollo Infantil – Campus Metepec',
+    address:
+      'Av. 5 532-3, Col. San José La Pilita, 52149 Metepec, Estado de México',
+    lat: 19.25877,
+    lng: -99.58566,
+  },
+  {
+    code: 'CO',
+    name: 'Casita del Saber – IEDIS Campus Ocoyoacac',
+    address:
+      'Av. Martín Chimaltecalt 122, Barrio de Santa María, 52740 Ocoyoacac, Estado de México',
+    lat: 19.2705874,
+    lng: -99.4751669,
+  },
+  {
+    code: 'DC',
+    name: 'IEDIS Centro de Desarrollo Infantil – Campus Calimaya',
+    address:
+      'Calle La Gardenia 45, San Andrés Ocotlán, 52220 Calimaya, Estado de México',
+    lat: 19.1925777,
+    lng: -99.5857616,
+  },
 ];
 
 async function main() {
+  console.log('DATABASE_URL:', process.env.DATABASE_URL);
   console.log('🌱 Seeding Planteles...');
-  
+
+  console.log('Existing Plantel count BEFORE:', await prisma.plantel.count());
+
   for (const p of planteles) {
+    console.log('Upserting plantel', p.code, '-', p.name);
     await prisma.plantel.upsert({
       where: { code: p.code },
-      update: {}, // If exists, do nothing
+      update: {
+        name: p.name,
+        address: p.address,
+        lat: p.lat,
+        lng: p.lng,
+        isActive: true,
+      },
       create: {
         name: p.name,
         code: p.code,
         address: p.address,
         lat: p.lat,
         lng: p.lng,
-        isActive: true
-      }
+        isActive: true,
+      },
     });
   }
+
+  console.log('Existing Plantel count AFTER:', await prisma.plantel.count());
   console.log('✅ Planteles seeded successfully.');
 }
 
 main()
   .catch((e) => {
+    console.error('❌ Seed failed with error:');
     console.error(e);
     process.exit(1);
   })

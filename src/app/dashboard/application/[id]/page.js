@@ -1,9 +1,12 @@
+// --- src\app\dashboard\application\[id]\page.js ---
 import { db } from '@/lib/db';
 import { auth } from '@/auth';
 import { updateApplicationStatus } from '@/actions/job-actions';
 import ProcessControl from '@/components/dashboard/ProcessControl';
 import Timeline from '@/components/dashboard/Timeline';
-import { ArrowLeft, Download, FileText, Mail, Phone } from 'lucide-react';
+import StatusManager from '@/components/dashboard/StatusManager'; // NEW
+import FavoriteButton from '@/components/dashboard/FavoriteButton'; // NEW
+import { ArrowLeft, Download, FileText, Mail, Phone, Shield } from 'lucide-react';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 
@@ -11,7 +14,7 @@ export default async function ApplicationDetail({ params }) {
   const session = await auth();
   if (!session) redirect('/');
 
-  // Fetch Application, Job, User, and Comments (Threaded)
+  // Fetch Application
   const app = await db.application.findUnique({
     where: { id: params.id },
     include: { 
@@ -35,15 +38,18 @@ export default async function ApplicationDetail({ params }) {
                 <ArrowLeft size={20} />
             </Link>
             <div>
-                <h1 className="text-xl font-bold text-slate-800">{app.fullName}</h1>
+                <h1 className="text-xl font-bold text-slate-800 flex items-center gap-2">
+                    {app.fullName}
+                </h1>
                 <div className="flex items-center gap-2 text-xs text-slate-500">
                     <span className="font-bold text-blue-600">{app.job.title}</span>
                     <span>•</span>
-                    <span>{app.job.plantel}</span>
+                    <span>{app.job.plantel?.name || 'Plantel'}</span>
                 </div>
             </div>
         </div>
-        <div className="flex gap-3">
+        <div className="flex gap-3 items-center">
+             <FavoriteButton applicationId={app.id} initialStatus={app.isFavorite} />
              {app.cvUrl && (
                  <a href={app.cvUrl} download className="flex items-center gap-2 px-4 py-2 bg-slate-800 text-white rounded-lg text-sm font-bold hover:bg-slate-900 transition shadow-sm">
                     <Download size={16} /> Descargar CV
@@ -72,37 +78,23 @@ export default async function ApplicationDetail({ params }) {
                     <p>No hay documento visualizable</p>
                  </div>
              )}
-             
-             {/* Extracted Text Preview (Optional helper) */}
-             {app.cvText && (
-                <div className="mt-4 h-32 bg-white rounded-lg p-4 overflow-y-auto text-xs text-slate-500 border border-slate-300 shadow-sm">
-                    <strong className="block mb-1 text-slate-700">Texto Detectado (IA):</strong>
-                    {app.cvText.substring(0, 500)}...
-                </div>
-             )}
         </div>
 
         {/* RIGHT: Controls & Timeline */}
         <div className="w-[400px] bg-white border-l border-gray-200 overflow-y-auto flex flex-col shadow-xl z-20">
             
-            {/* 1. Contact Info Card */}
+            {/* 1. Contact Info */}
             <div className="p-6 border-b border-slate-100">
                 <h3 className="font-bold text-slate-800 mb-4">Información de Contacto</h3>
                 <div className="space-y-3 text-sm">
                     <div className="flex items-center gap-3 p-2 rounded-lg bg-slate-50 text-slate-700">
                         <Mail size={16} className="text-blue-500" />
-                        <span>{app.user.email}</span>
+                        <span>{app.user?.email || app.email}</span>
                     </div>
                     <div className="flex items-center gap-3 p-2 rounded-lg bg-slate-50 text-slate-700">
                         <Phone size={16} className="text-green-500" />
                         <span>{app.phone || 'No registrado'}</span>
                     </div>
-                    {app.email && app.email !== app.user.email && (
-                        <div className="flex items-center gap-3 p-2 rounded-lg bg-slate-50 text-slate-700">
-                            <Mail size={16} className="text-slate-400" />
-                            <span className="text-xs text-slate-500">Alt: {app.email}</span>
-                        </div>
-                    )}
                 </div>
             </div>
 
@@ -148,7 +140,7 @@ export default async function ApplicationDetail({ params }) {
                  </form>
             </div>
 
-            {/* 4. Collaborative Timeline */}
+            {/* 4. Timeline */}
             <div className="flex-1 p-6 bg-slate-50">
                 <Timeline 
                     applicationId={app.id} 
@@ -157,30 +149,8 @@ export default async function ApplicationDetail({ params }) {
                 />
             </div>
 
-            {/* 5. Final Decision Sticky Footer */}
-            <div className="p-4 border-t border-gray-200 bg-white sticky bottom-0">
-                 <form action={async (fd) => {
-                    'use server';
-                    await updateApplicationStatus(app.id, { status: fd.get('status') });
-                 }}>
-                     <select 
-                        name="status" 
-                        defaultValue={app.status} 
-                        className={`w-full p-3 border rounded-lg text-sm font-bold mb-3 outline-none
-                            ${app.status === 'HIRED' ? 'bg-green-50 border-green-200 text-green-700' : 
-                              app.status === 'REJECTED' ? 'bg-red-50 border-red-200 text-red-700' : 
-                              'bg-white border-slate-300 text-slate-700'}`}
-                     >
-                        <option value="NEW">Nuevo / En Revisión</option>
-                        <option value="INTERVIEW">En Entrevistas</option>
-                        <option value="HIRED">✅ Contratado</option>
-                        <option value="REJECTED">❌ Descartado</option>
-                     </select>
-                     <button className="w-full py-3 bg-slate-900 text-white font-bold rounded-lg hover:bg-blue-600 transition shadow-lg">
-                        Actualizar Estado y Notificar
-                     </button>
-                 </form>
-            </div>
+            {/* 5. Status Manager (Replaced hardcoded form) */}
+            <StatusManager applicationId={app.id} currentStatus={app.status} />
 
         </div>
       </div>

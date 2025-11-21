@@ -8,20 +8,29 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// NEW: Dynamic Campus Management
 model Plantel {
   id          String   @id @default(cuid())
-  name        String   // Friendly name (e.g. "Campus Ecatepec")
-  code        String   @unique // Short code (e.g. "PREET")
+  name        String   
+  code        String   @unique 
   address     String   @db.Text
   lat         Float?
   lng         Float?
   isActive    Boolean  @default(true)
   
   jobs        Job[]
-  users       User[]   // Directors assigned specifically to this campus
+  users       User[]   
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+}
+
+// NEW: Standardized Job Titles (Puestos)
+model JobTitle {
+  id        String   @id @default(cuid())
+  name      String   @unique // e.g. "Docente", "Intendencia"
+  category  String?  // e.g. "Academico", "Administrativo"
+  isActive  Boolean  @default(true)
+  
+  jobs      Job[]
 }
 
 model User {
@@ -32,8 +41,6 @@ model User {
   image           String?
   role            String    @default("CANDIDATE") 
   
-  // REVISED: Relation to Plantel instead of comma-separated string
-  // If role is DIRECTOR, this links to their specific campus
   plantelId       String?
   plantel         Plantel?  @relation(fields: [plantelId], references: [id])
   
@@ -45,14 +52,20 @@ model User {
 
 model Job {
   id          String   @id @default(cuid())
-  title       String
+  
+  // REVISED: Link to JobTitle instead of free text
+  // We keep 'title' as a snapshot string in case the Puesto is deleted later, 
+  // but we prioritize the relation.
+  title       String   
+  jobTitleId  String?
+  jobTitle    JobTitle? @relation(fields: [jobTitleId], references: [id])
+
   description String   @db.Text
   department  String
   type        String   @default("Tiempo Completo")
   status      String   @default("OPEN") 
   closingDate DateTime?
   
-  // REVISED: Link to dynamic Plantel
   plantelId   String
   plantel     Plantel @relation(fields: [plantelId], references: [id])
   
@@ -64,17 +77,15 @@ model Job {
 model Application {
   id          String   @id @default(cuid())
   
-  // REVISED: User is now OPTIONAL for Guest Apply
   userId      String?
   user        User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
   
   jobId       String
   job         Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
   
-  // Essential Contact Data (Stored directly for guests)
   fullName    String
   phone       String?
-  email       String   // Mandatory for guests
+  email       String   
   cvUrl       String?  
   cvText      String?  @db.LongText
   
@@ -82,9 +93,11 @@ model Application {
   evaId       String?
   pathId      String?
   
+  // Statuses: NEW, INTERVIEW, TALENT_POOL, HIRED, REJECTED
   status      String   @default("NEW") 
   interviewStage Int   @default(0)     
-  
+  isFavorite  Boolean  @default(false)
+
   comments    Comment[]
 
   createdAt   DateTime @default(now())

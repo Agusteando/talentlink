@@ -12,6 +12,7 @@
     "seed": "node prisma/seed.js"
   },
   "dependencies": {
+    "@hello-pangea/dnd": "^18.0.1",
     "@prisma/client": "5.19.1",
     "clsx": "^2.1.1",
     "cookies-next": "^4.3.0",
