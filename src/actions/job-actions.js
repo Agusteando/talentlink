@@ -9,14 +9,24 @@ import { sendEmail } from "@/lib/email";
 import { generateEmailTemplate } from "@/lib/email-templates";
 
 // --- JOB MANAGEMENT ---
+
 export async function createJob(formData) {
   const session = await auth();
   if (!session || session.user.role !== 'ADMIN') return { error: "No autorizado." };
+
+  const jobTitleId = formData.get('jobTitleId');
+  if (!jobTitleId) return { error: "El Puesto es obligatorio." };
+
   try {
+    // 1. Validate Puesto and Get Name
+    const jobTitle = await db.jobTitle.findUnique({ where: { id: jobTitleId } });
+    if (!jobTitle) return { error: "Puesto inválido o no encontrado." };
+
+    // 2. Create Job using the Puesto's official name for the snapshot
     await db.job.create({
       data: {
-        title: formData.get('title'),
-        jobTitleId: formData.get('jobTitleId'),
+        title: jobTitle.name, // ENFORCED: Comes from DB, not client text
+        jobTitleId: jobTitle.id,
         description: formData.get('description'),
         plantelId: formData.get('plantelId'),
         department: formData.get('department'),
@@ -25,20 +35,32 @@ export async function createJob(formData) {
         closingDate: formData.get('closingDate') ? new Date(formData.get('closingDate')) : null
       }
     });
+
     revalidatePath('/dashboard/jobs');
     return { success: true };
-  } catch (error) { return { error: "Error DB" }; }
+  } catch (error) {
+    console.error(error);
+    return { error: "Error de base de datos." };
+  }
 }
 
 export async function updateJob(formData) {
     const session = await auth();
     if (!session || session.user.role !== 'ADMIN') return { error: "No autorizado." };
+    
+    const jobTitleId = formData.get('jobTitleId');
+    if (!jobTitleId) return { error: "El Puesto es obligatorio." };
+
     try {
+      // 1. Validate Puesto
+      const jobTitle = await db.jobTitle.findUnique({ where: { id: jobTitleId } });
+      if (!jobTitle) return { error: "Puesto inválido." };
+
       await db.job.update({
         where: { id: formData.get('jobId') },
         data: {
-          title: formData.get('title'),
-          jobTitleId: formData.get('jobTitleId'),
+          title: jobTitle.name, // ENFORCED
+          jobTitleId: jobTitle.id,
           description: formData.get('description'),
           plantelId: formData.get('plantelId'),
           department: formData.get('department'),
@@ -48,7 +70,9 @@ export async function updateJob(formData) {
       });
       revalidatePath('/dashboard/jobs');
       return { success: true };
-    } catch (error) { return { error: "Error DB" }; }
+    } catch (error) {
+      return { error: "Error DB" };
+    }
 }
 
 export async function deleteJob(jobId) {
@@ -61,50 +85,51 @@ export async function deleteJob(jobId) {
     } catch (e) { return { error: "Error DB" }; }
 }
 
-// --- APPLICATION ---
+// ... [Rest of the file remains unchanged: applyJob, toggleApplicationFavorite, etc.]
+// Ensure you keep the Application actions below this block
 export async function applyJob(formData) {
-  const token = formData.get('g-recaptcha-response');
-  if (!token) return { error: "Falta captcha." };
-  const session = await auth();
-  const file = formData.get('cv');
-  let cvUrl = "", cvText = "", detectedEmail = "";
-  
-  if (file && file.size > 0) {
-    try {
-        const savedFile = await saveFileToDisk(file);
-        cvUrl = savedFile.url;
-        const extracted = await extractResumeData(savedFile.buffer, file.type);
-        cvText = extracted.text;
-        detectedEmail = extracted.email;
-    } catch (e) { return { error: "Error archivo" }; }
-  }
-
-  const finalEmail = formData.get('email') || detectedEmail;
-
-  try {
-    const job = await db.job.findUnique({ where: { id: formData.get('jobId') } });
-    await db.application.create({
-      data: {
-        userId: session?.user?.id || null,
-        jobId: formData.get('jobId'),
-        fullName: formData.get('fullName'),
-        phone: formData.get('phone'), 
-        email: finalEmail,
-        cvUrl: cvUrl,
-        cvText: cvText
-      }
-    });
+    // ... (Same as previous valid version)
+    const token = formData.get('g-recaptcha-response');
+    if (!token) return { error: "Falta captcha." };
+    const session = await auth();
+    const file = formData.get('cv');
+    let cvUrl = "", cvText = "", detectedEmail = "";
     
-    if (finalEmail) {
-        const t = generateEmailTemplate('CONFIRMATION', { candidateName: formData.get('fullName'), jobTitle: job.title });
-        await sendEmail({ to: finalEmail, subject: t.subject, html: t.html });
+    if (file && file.size > 0) {
+      try {
+          const savedFile = await saveFileToDisk(file);
+          cvUrl = savedFile.url;
+          const extracted = await extractResumeData(savedFile.buffer, file.type);
+          cvText = extracted.text;
+          detectedEmail = extracted.email;
+      } catch (e) { return { error: "Error archivo" }; }
     }
-    if(session?.user?.id) revalidatePath('/my-applications');
-    return { success: true };
-  } catch (e) { return { error: "Error DB" }; }
+  
+    const finalEmail = formData.get('email') || detectedEmail;
+  
+    try {
+      const job = await db.job.findUnique({ where: { id: formData.get('jobId') } });
+      await db.application.create({
+        data: {
+          userId: session?.user?.id || null,
+          jobId: formData.get('jobId'),
+          fullName: formData.get('fullName'),
+          phone: formData.get('phone'), 
+          email: finalEmail,
+          cvUrl: cvUrl,
+          cvText: cvText
+        }
+      });
+      
+      if (finalEmail) {
+          const t = generateEmailTemplate('CONFIRMATION', { candidateName: formData.get('fullName'), jobTitle: job.title });
+          await sendEmail({ to: finalEmail, subject: t.subject, html: t.html });
+      }
+      if(session?.user?.id) revalidatePath('/my-applications');
+      return { success: true };
+    } catch (e) { return { error: "Error DB" }; }
 }
 
-// --- WORKFLOW ---
 export async function toggleApplicationFavorite(appId) {
     const session = await auth();
     if (!session || session.user.role === 'CANDIDATE') return { error: "Unauthorized" };
