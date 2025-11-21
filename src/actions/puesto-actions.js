@@ -1,50 +1,80 @@
-// --- src\actions\puesto-actions.js ---
+
 'use server';
 
 import { db } from "@/lib/db";
 import { auth } from "@/auth";
 import { revalidatePath } from "next/cache";
+import { PERMISSIONS } from "@/lib/permissions";
 
-export async function createPuesto(formData) {
-    const session = await auth();
-    if (session?.user?.role !== 'ADMIN') return { error: "Unauthorized" };
-
-    try {
-        await db.jobTitle.create({
-            data: {
-                name: formData.get('name'),
-                category: formData.get('category'),
-                isActive: true
-            }
-        });
-        revalidatePath('/dashboard/puestos');
-        return { success: true };
-    } catch (e) {
-        return { error: "El puesto ya existe." };
-    }
+function hasConfigPermission(session) {
+  return session?.user?.permissions?.includes(PERMISSIONS.MANAGE_CONFIG);
 }
 
-export async function togglePuestoStatus(id, currentStatus) {
-    const session = await auth();
-    if (session?.user?.role !== 'ADMIN') return { error: "Unauthorized" };
+export async function createPuesto(formData) {
+  const session = await auth();
+  const allowed = hasConfigPermission(session);
+  console.log("[Puestos] createPuesto invoked", { email: session?.user?.email, allowed });
 
-    await db.jobTitle.update({
-        where: { id },
-        data: { isActive: !currentStatus }
+  if (!allowed) {
+    console.warn("[Puestos] Unauthorized create attempt", { email: session?.user?.email });
+    return { error: "No autorizado" };
+  }
+
+  try {
+    await db.jobTitle.create({
+      data: {
+        name: (formData.get('name') || '').toString().trim(),
+        category: (formData.get('category') || '').toString().trim(),
+        isActive: true
+      }
     });
     revalidatePath('/dashboard/puestos');
     return { success: true };
+  } catch (e) {
+    console.error("[Puestos] create error:", e?.message);
+    return { error: "El puesto ya existe o ocurrió un error." };
+  }
+}
+
+export async function togglePuestoStatus(id, currentStatus) {
+  const session = await auth();
+  const allowed = hasConfigPermission(session);
+  console.log("[Puestos] togglePuestoStatus invoked", { email: session?.user?.email, allowed, id, currentStatus });
+
+  if (!allowed) {
+    console.warn("[Puestos] Unauthorized toggle attempt", { email: session?.user?.email });
+    return { error: "No autorizado" };
+  }
+
+  try {
+    await db.jobTitle.update({
+      where: { id },
+      data: { isActive: !currentStatus }
+    });
+    revalidatePath('/dashboard/puestos');
+    return { success: true };
+  } catch (e) {
+    console.error("[Puestos] toggle error:", e?.message);
+    return { error: "Error al actualizar el estado." };
+  }
 }
 
 export async function deletePuesto(id) {
-    const session = await auth();
-    if (session?.user?.role !== 'ADMIN') return { error: "Unauthorized" };
+  const session = await auth();
+  const allowed = hasConfigPermission(session);
+  console.log("[Puestos] deletePuesto invoked", { email: session?.user?.email, allowed, id });
 
-    try {
-        await db.jobTitle.delete({ where: { id } });
-        revalidatePath('/dashboard/puestos');
-        return { success: true };
-    } catch (e) {
-        return { error: "No se puede eliminar, está en uso por vacantes." };
-    }
+  if (!allowed) {
+    console.warn("[Puestos] Unauthorized delete attempt", { email: session?.user?.email });
+    return { error: "No autorizado" };
+  }
+
+  try {
+    await db.jobTitle.delete({ where: { id } });
+    revalidatePath('/dashboard/puestos');
+    return { success: true };
+  } catch (e) {
+    console.error("[Puestos] delete error:", e?.message);
+    return { error: "No se puede eliminar, está en uso por vacantes." };
+  }
 }
