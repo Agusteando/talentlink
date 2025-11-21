@@ -3,32 +3,66 @@ import { db } from '@/lib/db';
 import { auth } from '@/auth';
 import { redirect } from 'next/navigation';
 import KanbanBoard from '@/components/dashboard/KanbanBoard';
+import { PERMISSIONS } from '@/lib/permissions';
 
 export const dynamic = 'force-dynamic';
 
 export default async function KanbanPage() {
   const session = await auth();
-  if (!session || session.user.role === 'CANDIDATE') redirect('/my-applications');
-
-  // Filter logic same as dashboard
-  let whereClause = {};
-  if (session.user.role === 'DIRECTOR') {
-      whereClause = session.user.plantelId ? { job: { plantelId: session.user.plantelId } } : { id: 'none' };
+  // PERMISSION CHECK
+  if (!session?.user?.permissions?.includes(PERMISSIONS.VIEW_CANDIDATES)) {
+      redirect('/dashboard');
   }
 
+  // Role-based Data Scope
+  let whereClause = {};
+  
+  // Directors only see their own Plantel data
+  if (!session.user.isGlobal && session.user.plantelId) {
+      whereClause = { job: { plantelId: session.user.plantelId } };
+  }
+
+  // 1. Fetch Applications
   const applications = await db.application.findMany({
       where: whereClause,
-      include: { job: true, user: true },
+      include: { 
+          job: { 
+              include: { 
+                  plantel: true,
+                  jobTitle: true 
+              } 
+          }, 
+          user: true 
+      },
       orderBy: { createdAt: 'desc' }
   });
 
+  // 2. Fetch Filter Options (Planteles & Puestos)
+  // We only need these for the dropdowns
+  const [plantels, jobTitles] = await Promise.all([
+      db.plantel.findMany({ 
+          where: { isActive: true }, 
+          orderBy: { name: 'asc' } 
+      }),
+      db.jobTitle.findMany({ 
+          where: { isActive: true }, 
+          orderBy: { name: 'asc' } 
+      })
+  ]);
+
   return (
-    <div className="h-[calc(100vh-100px)]">
-       <div className="mb-4 px-2">
+    <div className="h-[calc(100vh-80px)] flex flex-col">
+       <div className="px-6 py-4 border-b border-slate-200 bg-white shrink-0">
           <h1 className="text-2xl font-bold text-slate-800">Tablero de Seguimiento</h1>
-          <p className="text-slate-500 text-sm">Arrastra y suelta los candidatos para cambiar su estado.</p>
+          <p className="text-slate-500 text-sm">Gestión visual del flujo de candidatos.</p>
        </div>
-       <KanbanBoard initialData={applications} />
+       
+       {/* Pass everything to the Client Component */}
+       <KanbanBoard 
+            initialData={applications} 
+            plantels={plantels}
+            jobTitles={jobTitles}
+       />
     </div>
   );
 }
