@@ -5,22 +5,28 @@ import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { format, isSameDay, startOfMonth, endOfMonth, eachDayOfInterval, isToday } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { Clock, MapPin, User } from 'lucide-react';
+import { Clock, MapPin } from 'lucide-react';
+import { PERMISSIONS } from '@/lib/permissions';
 
 export const dynamic = 'force-dynamic';
 
-export default async function CalendarPage({ searchParams }) {
+export default async function CalendarPage() {
   const session = await auth();
-  if (!session || session.user.role === 'CANDIDATE') redirect('/my-applications');
+  if (!session?.user?.permissions?.includes(PERMISSIONS.VIEW_CANDIDATES)) {
+      redirect('/dashboard');
+  }
 
-  // Filter logic
+  // 1:N FILTER
   let whereClause = {
-    interviewDate: { not: null } // Only scheduled interviews
+    interviewDate: { not: null }
   };
 
-  if (session.user.role === 'DIRECTOR') {
-      if (session.user.plantelId) {
-        whereClause.job = { plantelId: session.user.plantelId };
+  if (!session.user.isGlobal) {
+      const ids = session.user.plantelIds || [];
+      if (ids.length > 0) {
+          whereClause.job = { plantelId: { in: ids } };
+      } else {
+          whereClause.id = 'none';
       }
   }
 
@@ -30,7 +36,6 @@ export default async function CalendarPage({ searchParams }) {
       orderBy: { interviewDate: 'asc' }
   });
 
-  // Simple Month Grid Logic
   const today = new Date();
   const currentMonth = today; 
   const days = eachDayOfInterval({
@@ -51,7 +56,6 @@ export default async function CalendarPage({ searchParams }) {
        </div>
 
        <div className="grid lg:grid-cols-3 gap-8">
-           {/* LIST VIEW (Upcoming) */}
            <div className="lg:col-span-1 space-y-4">
                <h2 className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-4">Próximos Eventos</h2>
                {interviews.length === 0 && <div className="text-slate-400 text-sm italic">No hay entrevistas programadas.</div>}
@@ -79,7 +83,6 @@ export default async function CalendarPage({ searchParams }) {
                ))}
            </div>
 
-           {/* CALENDAR GRID VIEW */}
            <div className="lg:col-span-2 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
                 <div className="grid grid-cols-7 gap-2 mb-2">
                     {['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'].map(d => (

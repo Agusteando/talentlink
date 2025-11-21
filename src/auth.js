@@ -1,4 +1,3 @@
-// --- src/auth.js ---
 import NextAuth from "next-auth"
 import Google from "next-auth/providers/google"
 import { db } from "@/lib/db"
@@ -12,71 +11,88 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   providers: [Google],
   callbacks: {
     async signIn({ user }) {
+      console.log(`🔐 Attempting login for: ${user.email}`);
+
       if (!user.email) return false;
 
-      // 1. DOMAIN CHECK
+      // 1. SECURITY CHECK
       const emailDomain = user.email.split('@')[1];
       const isAllowedDomain = emailDomain === ALLOWED_DOMAIN;
       const isAdminEmail = user.email === process.env.DEFAULT_ADMIN_EMAIL;
 
-      if (!isAllowedDomain && !isAdminEmail) return false; 
+      if (!isAllowedDomain && !isAdminEmail) {
+        console.error(`🚫 BLOCKING LOGIN: ${user.email} is not in ${ALLOWED_DOMAIN} and is not the Default Admin.`);
+        return false; 
+      }
       
       try {
-        // 2. BOOTSTRAP SUPER ADMIN ROLE (If missing)
-        let adminRole = await db.role.findUnique({ where: { name: 'Super Admin' } });
+        // 2. ENSURE SUPER ADMIN ROLE EXISTS
+        // We use upsert to guarantee it exists and has correct permissions
+        const allPerms = JSON.stringify(Object.values(PERMISSIONS));
         
-        if (!adminRole) {
-            adminRole = await db.role.create({
-                data: {
-                    name: 'Super Admin',
-                    isGlobal: true,
-                    permissions: JSON.stringify(Object.values(PERMISSIONS))
-                }
-            });
-        }
+        const adminRole = await db.role.upsert({
+            where: { name: 'Super Admin' },
+            update: { 
+                isGlobal: true, 
+                permissions: allPerms // Self-heal permissions if they were empty
+            },
+            create: {
+                name: 'Super Admin',
+                isGlobal: true,
+                permissions: allPerms
+            }
+        });
 
-        // 3. SYNC USER
+        // 3. HANDLE USER (Create or Update)
         const existingUser = await db.user.findUnique({ where: { email: user.email } });
 
         if (!existingUser) {
-          await db.user.create({
-            data: {
-              email: user.email,
-              name: user.name,
-              image: user.image,
-              roleId: adminRole.id, 
-            }
-          });
+            console.log("👤 Creating New User as Super Admin");
+            await db.user.create({
+                data: {
+                    email: user.email,
+                    name: user.name,
+                    image: user.image,
+                    roleId: adminRole.id, // Assign Role immediately
+                }
+            });
         } else {
-             if (!existingUser.roleId) {
-                 await db.user.update({
+            // FIX: If user exists but has NO role (Ghost User), give them Admin
+            if (!existingUser.roleId) {
+                console.log("🔧 Fixing User Role (assigning Super Admin)");
+                await db.user.update({
                     where: { email: user.email },
                     data: { roleId: adminRole.id }
-                 });
-             }
+                });
+            }
         }
+        
         return true;
       } catch (error) {
-        console.error("SignIn Error:", error);
-        return false; 
+        console.error("❌ LOGIN CRASHED:", error);
+        return false; // This causes the "Access Denied" screen
       }
     },
     async session({ session }) {
       if (session.user.email) {
         try {
+            // 4. LOAD SESSION DATA (With 1:N Plantels fix)
             const dbUser = await db.user.findUnique({ 
                 where: { email: session.user.email },
-                include: { role: true, plantel: true } 
+                include: { 
+                    role: true, 
+                    plantels: true // Fix: Plural
+                } 
             });
             
             if (dbUser) {
                 session.user.id = dbUser.id;
-                session.user.plantelId = dbUser.plantelId || null;
-                session.user.plantelName = dbUser.plantel?.name || null;
+                // Fix: Handle array mapping safely
+                session.user.plantelIds = dbUser.plantels ? dbUser.plantels.map(p => p.id) : [];
                 
-                // ROLE HYDRATION
+                // Role Hydration
                 if (dbUser.role) {
-                    session.user.roleName = dbUser.role.name; // Uses real DB name
+                    session.user.roleName = dbUser.role.name;
                     session.user.isGlobal = dbUser.role.isGlobal;
                     try {
                         session.user.permissions = JSON.parse(dbUser.role.permissions);
@@ -84,24 +100,22 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                         session.user.permissions = [];
                     }
                 } else {
-                    session.user.roleName = "Usuario"; // Neutral fallback
+                    session.user.roleName = "Sin Rol";
                     session.user.permissions = [];
                     session.user.isGlobal = false;
                 }
 
-                // SAFETY HATCH (Transparent)
-                // If you are the ENV admin, you get full permissions, but the UI
-                // simply calls you "Super Admin" or respects your DB role name if it exists.
+                // 5. ADMIN OVERRIDE (The "User One" Safety Net)
+                // Even if DB is corrupted, if env email matches, give full access
                 if (session.user.email === process.env.DEFAULT_ADMIN_EMAIL) {
                     session.user.permissions = Object.values(PERMISSIONS);
                     session.user.isGlobal = true;
-                    if (!session.user.roleName || session.user.roleName === "Usuario") {
-                        session.user.roleName = "Super Admin";
-                    }
+                    session.user.roleName = "Super Admin";
                 }
             }
         } catch (e) {
-            console.error("Session Error:", e);
+            console.error("⚠️ Session Error:", e);
+            // Don't crash the session, just degrade gracefully
             session.user.permissions = [];
         }
       }

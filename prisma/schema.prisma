@@ -8,7 +8,7 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// --- CORE INFRASTRUCTURE ---
+// --- INFRASTRUCTURE ---
 
 model Plantel {
   id          String   @id @default(cuid())
@@ -18,8 +18,12 @@ model Plantel {
   lat         Float?
   lng         Float?
   isActive    Boolean  @default(true)
+  
   jobs        Job[]
+  
+  // REVISED: Many-to-Many relation with Users
   users       User[]   
+  
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 }
@@ -40,7 +44,7 @@ model ChecklistTemplate {
   createdAt DateTime @default(now())
 }
 
-// --- DYNAMIC RBAC SYSTEM ---
+// --- RBAC ---
 
 model Role {
   id          String   @id @default(cuid())
@@ -60,11 +64,10 @@ model User {
   image           String?
   
   roleId          String?
-  // Explicit map to prevent conflicts
   role            Role?     @relation(fields: [roleId], references: [id], map: "fk_user_role")
   
-  plantelId       String?
-  plantel         Plantel?  @relation(fields: [plantelId], references: [id], map: "fk_user_plantel")
+  // REVISED: Many-to-Many. No longer a single string ID.
+  plantels        Plantel[]
   
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
@@ -72,7 +75,7 @@ model User {
   comments        Comment[] 
 }
 
-// --- BUSINESS LOGIC ---
+// --- BUSINESS ---
 
 model Job {
   id          String   @id @default(cuid())
@@ -121,15 +124,11 @@ model Application {
 
 model ChecklistValue {
   id          String   @id @default(cuid())
-  
   applicationId String
-  // FIX: Explicit map name to solve the "Duplicate foreign key" error
   application   Application @relation(fields: [applicationId], references: [id], onDelete: Cascade, map: "fk_checklist_app")
-  
   templateId    String   
   value         String?  @db.Text 
   updatedAt     DateTime @updatedAt
-  
   @@unique([applicationId, templateId])
 }
 

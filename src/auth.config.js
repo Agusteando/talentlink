@@ -1,4 +1,4 @@
-// --- src/auth.config.js ---
+
 export const authConfig = {
   pages: {
     signIn: '/', // If they get kicked out, send them Home
@@ -9,22 +9,18 @@ export const authConfig = {
       const isLoggedIn = !!auth?.user;
       const role = auth?.user?.role;
 
-      // 1. Protect Dashboard Routes (Admin/Director/RH)
       const isOnDashboard = nextUrl.pathname.startsWith('/dashboard');
       if (isOnDashboard) {
-        if (!isLoggedIn) return false; // Redirect unauthenticated to Home
-        if (role === 'CANDIDATE') return Response.redirect(new URL('/my-applications', nextUrl));
-        return true; // Grant access
+        // Allow only authenticated, non-candidate users; redirection handled by NextAuth/pages
+        return isLoggedIn && role !== 'CANDIDATE';
       }
 
-      // 2. Protect Candidate Routes
       const isOnMyApps = nextUrl.pathname.startsWith('/my-applications');
       if (isOnMyApps) {
-        if (!isLoggedIn) return false;
-        return true;
+        return isLoggedIn;
       }
 
-      // 3. Public Routes (Home, Apply) -> Allow everyone
+      // Public Routes (Home, Apply) -> Allow everyone
       return true;
     },
   },

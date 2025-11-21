@@ -1,8 +1,12 @@
+
 // --- src\app\page.js ---
 import { db } from "@/lib/db";
 import Header from "@/components/ui/Header";
 import Link from "next/link";
 import { Search, MapPin, Briefcase, ArrowRight, Sparkles, Building2, Calendar } from "lucide-react";
+import { auth } from "@/auth";
+import { redirect } from "next/navigation";
+import { PERMISSIONS } from "@/lib/permissions";
 
 export const dynamic = 'force-dynamic';
 
@@ -12,6 +16,20 @@ function isJobNew(date) {
 }
 
 export default async function Home({ searchParams }) {
+  const session = await auth();
+
+  // Server-side redirect: If authenticated staff (dashboard access), send to dashboard
+  if (session?.user) {
+    const canView = session.user.permissions?.includes(PERMISSIONS.VIEW_DASHBOARD) 
+      || session.user.roleName === 'Super Admin' 
+      || session.user.isGlobal;
+    // Debug: Validate redirect logic
+    console.log('[Home] session redirect check', { email: session.user.email, canView });
+    if (canView) {
+      redirect('/dashboard');
+    }
+  }
+
   const query = searchParams?.q || "";
   const plantelId = searchParams?.plantel || "";
   
@@ -41,7 +59,7 @@ export default async function Home({ searchParams }) {
 
   return (
     <div className="min-h-screen bg-slate-50">
-      <Header /> {/* No props needed now */}
+      <Header />
       
       {/* --- HERO SECTION --- */}
       <div className="relative overflow-hidden bg-slate-900 py-24 lg:py-32">

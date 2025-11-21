@@ -3,21 +3,27 @@ import { db } from '@/lib/db';
 import { auth } from '@/auth';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
-import { PlusCircle, Calendar, Building2, AlertCircle } from 'lucide-react';
+import { PlusCircle, AlertCircle } from 'lucide-react';
 import JobRow from '@/components/dashboard/jobs/JobRow';
+import { PERMISSIONS } from '@/lib/permissions';
 
 export const dynamic = 'force-dynamic';
 
 export default async function JobsManagementPage() {
   const session = await auth();
-  if (!session || session.user.role === 'CANDIDATE') redirect('/my-applications');
+  if (!session?.user?.permissions?.includes(PERMISSIONS.MANAGE_JOBS)) {
+      redirect('/dashboard');
+  }
 
+  // 1:N FILTER
   let whereClause = {};
-  if (session.user.role === 'DIRECTOR') {
-      if (session.user.plantelId) {
-          whereClause = { plantelId: session.user.plantelId };
+  
+  if (!session.user.isGlobal) {
+      const ids = session.user.plantelIds || [];
+      if (ids.length > 0) {
+          whereClause = { plantelId: { in: ids } };
       } else {
-          whereClause = { id: 'none' }; 
+          whereClause = { id: 'none' };
       }
   }
 
@@ -32,20 +38,16 @@ export default async function JobsManagementPage() {
 
   return (
     <div>
-       {/* Page Header */}
        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
             <div>
                 <h1 className="text-2xl font-bold text-slate-800">Gestión de Vacantes</h1>
                 <p className="text-slate-500">Control de ofertas laborales activas e historial.</p>
             </div>
-            {session.user.role === 'ADMIN' && (
-                <Link href="/dashboard/jobs/new" className="flex items-center justify-center gap-2 rounded-xl bg-slate-900 px-6 py-3 text-sm font-bold text-white hover:bg-blue-600 shadow-lg transition-all">
-                    <PlusCircle size={18} /> Publicar Nueva Vacante
-                </Link>
-            )}
+            <Link href="/dashboard/jobs/new" className="flex items-center justify-center gap-2 rounded-xl bg-slate-900 px-6 py-3 text-sm font-bold text-white hover:bg-blue-600 shadow-lg transition-all">
+                <PlusCircle size={18} /> Publicar Nueva Vacante
+            </Link>
        </div>
 
-       {/* Grid */}
        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
             {jobs.length === 0 && (
                 <div className="col-span-3 text-center py-20 bg-white rounded-2xl border border-slate-200 border-dashed">
@@ -54,7 +56,7 @@ export default async function JobsManagementPage() {
                 </div>
             )}
             {jobs.map((job) => (
-                <JobRow key={job.id} job={job} isAdmin={session.user.role === 'ADMIN'} />
+                <JobRow key={job.id} job={job} isAdmin={true} />
             ))}
        </div>
     </div>

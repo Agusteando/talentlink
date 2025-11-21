@@ -7,17 +7,19 @@ import { PERMISSIONS } from '@/lib/permissions';
 
 export default async function NewJobPage() {
   const session = await auth();
-  
-  // OLD LOGIC (BROKEN): if (session?.user?.role !== 'ADMIN') ...
-  // NEW LOGIC (FIXED): Check Permission
   if (!session?.user?.permissions?.includes(PERMISSIONS.MANAGE_JOBS)) {
-      return redirect('/dashboard');
+      redirect('/dashboard');
   }
 
-  // Fetch dependencies for the form
+  // Filter dropdown for 1:N Plantels
+  let plantelWhere = { isActive: true };
+  if (!session.user.isGlobal) {
+      plantelWhere.id = { in: session.user.plantelIds || [] };
+  }
+
   const [plantels, jobTitles] = await Promise.all([
       db.plantel.findMany({ 
-          where: { isActive: true },
+          where: plantelWhere,
           orderBy: { name: 'asc' }
       }),
       db.jobTitle.findMany({
@@ -27,10 +29,6 @@ export default async function NewJobPage() {
   ]);
 
   return (
-    <JobForm 
-        plantels={plantels} 
-        jobTitles={jobTitles} 
-        isEdit={false} 
-    />
+    <JobForm plantels={plantels} jobTitles={jobTitles} isEdit={false} />
   );
 }

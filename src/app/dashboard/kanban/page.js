@@ -9,20 +9,22 @@ export const dynamic = 'force-dynamic';
 
 export default async function KanbanPage() {
   const session = await auth();
-  // PERMISSION CHECK
   if (!session?.user?.permissions?.includes(PERMISSIONS.VIEW_CANDIDATES)) {
       redirect('/dashboard');
   }
 
-  // Role-based Data Scope
+  // 1:N FILTER
   let whereClause = {};
   
-  // Directors only see their own Plantel data
-  if (!session.user.isGlobal && session.user.plantelId) {
-      whereClause = { job: { plantelId: session.user.plantelId } };
+  if (!session.user.isGlobal) {
+      const ids = session.user.plantelIds || [];
+      if (ids.length > 0) {
+          whereClause = { job: { plantelId: { in: ids } } };
+      } else {
+          whereClause = { id: 'none' };
+      }
   }
 
-  // 1. Fetch Applications
   const applications = await db.application.findMany({
       where: whereClause,
       include: { 
@@ -37,8 +39,6 @@ export default async function KanbanPage() {
       orderBy: { createdAt: 'desc' }
   });
 
-  // 2. Fetch Filter Options (Planteles & Puestos)
-  // We only need these for the dropdowns
   const [plantels, jobTitles] = await Promise.all([
       db.plantel.findMany({ 
           where: { isActive: true }, 
@@ -57,7 +57,6 @@ export default async function KanbanPage() {
           <p className="text-slate-500 text-sm">Gestión visual del flujo de candidatos.</p>
        </div>
        
-       {/* Pass everything to the Client Component */}
        <KanbanBoard 
             initialData={applications} 
             plantels={plantels}
