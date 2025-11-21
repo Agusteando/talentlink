@@ -21,7 +21,7 @@ export async function createPuesto(formData) {
   }
 
   try {
-    await db.jobTitle.create({
+    const created = await db.jobTitle.create({
       data: {
         name: (formData.get('name') || '').toString().trim(),
         category: (formData.get('category') || '').toString().trim(),
@@ -29,7 +29,8 @@ export async function createPuesto(formData) {
       }
     });
     revalidatePath('/dashboard/puestos');
-    return { success: true };
+    // Return the created record so client UIs can immediately use it
+    return { success: true, puesto: { id: created.id, name: created.name, category: created.category, isActive: created.isActive } };
   } catch (e) {
     console.error("[Puestos] create error:", e?.message);
     return { error: "El puesto ya existe o ocurrió un error." };

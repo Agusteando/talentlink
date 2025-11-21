@@ -1,14 +1,15 @@
+
 // --- src\app\dashboard\jobs\new\page.js ---
-import { db } from '@/lib/db';
-import { auth } from '@/auth';
-import { redirect } from 'next/navigation';
-import JobForm from '@/components/dashboard/jobs/JobForm';
-import { PERMISSIONS } from '@/lib/permissions';
+import { db } from "@/lib/db";
+import { auth } from "@/auth";
+import { redirect } from "next/navigation";
+import JobForm from "@/components/dashboard/jobs/JobForm";
+import { PERMISSIONS } from "@/lib/permissions";
 
 export default async function NewJobPage() {
   const session = await auth();
   if (!session?.user?.permissions?.includes(PERMISSIONS.MANAGE_JOBS)) {
-      redirect('/dashboard');
+      redirect("/dashboard");
   }
 
   // Filter dropdown for 1:N Plantels
@@ -20,15 +21,22 @@ export default async function NewJobPage() {
   const [plantels, jobTitles] = await Promise.all([
       db.plantel.findMany({ 
           where: plantelWhere,
-          orderBy: { name: 'asc' }
+          orderBy: { name: "asc" }
       }),
       db.jobTitle.findMany({
           where: { isActive: true },
-          orderBy: { name: 'asc' }
+          orderBy: { name: "asc" }
       })
   ]);
 
+  const canManageCatalog = session.user.permissions?.includes(PERMISSIONS.MANAGE_CONFIG) || false;
+
   return (
-    <JobForm plantels={plantels} jobTitles={jobTitles} isEdit={false} />
+    <JobForm 
+      plantels={plantels} 
+      jobTitles={jobTitles} 
+      isEdit={false} 
+      canManageCatalog={canManageCatalog}
+    />
   );
 }
