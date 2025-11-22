@@ -1,0 +1,71 @@
+
+/// ---- Notification Center Schema Snippet ----
+/// Merge these models/enums into your main Prisma schema.prisma.
+/// They reference existing models: User, Plantel, Job, JobTitle, Application.
+
+enum NotificationType {
+  NEW_APPLICATION
+  STATUS_UPDATE
+}
+
+model Notification {
+  id            String           @id @default(cuid())
+  user          User             @relation(fields: [userId], references: [id])
+  userId        String
+  type          NotificationType
+  title         String
+  message       String
+  link          String?
+  createdAt     DateTime         @default(now())
+  readAt        DateTime?
+
+  // Optional context for richer UI
+  application   Application?     @relation(fields: [applicationId], references: [id])
+  applicationId String?
+  job           Job?             @relation(fields: [jobId], references: [id])
+  jobId         String?
+  plantel       Plantel?         @relation(fields: [plantelId], references: [id])
+  plantelId     String?
+}
+
+model NotificationPreference {
+  id                  String   @id @default(cuid())
+  user                User     @relation(fields: [userId], references: [id])
+  userId              String
+
+  // Scope: null = global; plantel- or puesto- specific overrides
+  plantel             Plantel?  @relation(fields: [plantelId], references: [id])
+  plantelId           String?
+  jobTitle            JobTitle? @relation(fields: [jobTitleId], references: [id])
+  jobTitleId          String?
+
+  // Email channels
+  emailNewEntries     Boolean  @default(true)
+  emailStatusUpdates  Boolean  @default(true)
+
+  // In-app notification center
+  inAppNewEntries     Boolean  @default(true)
+  inAppStatusUpdates  Boolean  @default(true)
+
+  // Web Push channels
+  pushNewEntries      Boolean  @default(false)
+  pushStatusUpdates   Boolean  @default(false)
+
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@unique([userId, plantelId, jobTitleId])
+}
+
+model PushSubscription {
+  id        String   @id @default(cuid())
+  user      User     @relation(fields: [userId], references: [id])
+  userId    String
+
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+
+  userAgent String?
+  createdAt DateTime @default(now())
+}

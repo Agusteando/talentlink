@@ -1,5 +1,5 @@
 
-'use server';
+"use server";
 
 import { db } from "@/lib/db";
 import { auth } from "@/auth";
@@ -8,11 +8,53 @@ import { saveFileToDisk, extractResumeData } from "@/lib/file-handler";
 import { sendGmail, createCalendarEvent } from "@/lib/google";
 import { generateEmailTemplate } from "@/lib/email-templates";
 import { PERMISSIONS } from "@/lib/permissions";
+import { sendUserPushNotifications } from "@/lib/push";
 
 // helper to check plantel access
 function hasPlantelAccess(session, targetPlantelId) {
   if (session.user.isGlobal) return true;
   return session.user.plantelIds?.includes(targetPlantelId);
+}
+
+const DEFAULT_PREF = {
+  emailNewEntries: true,
+  emailStatusUpdates: true,
+  inAppNewEntries: true,
+  inAppStatusUpdates: true,
+  pushNewEntries: false,
+  pushStatusUpdates: false,
+};
+
+function resolveEffectivePreference(userId, plantelId, jobTitleId, allPrefs) {
+  const prefsForUser = allPrefs.filter((p) => p.userId === userId);
+
+  if (prefsForUser.length === 0) return DEFAULT_PREF;
+
+  const exact =
+    prefsForUser.find(
+      (p) => p.plantelId === plantelId && p.jobTitleId === jobTitleId
+    ) || null;
+  const plantelOnly =
+    prefsForUser.find((p) => p.plantelId === plantelId && p.jobTitleId === null) ||
+    null;
+  const jobOnly =
+    prefsForUser.find((p) => p.plantelId === null && p.jobTitleId === jobTitleId) ||
+    null;
+  const globalPref =
+    prefsForUser.find((p) => p.plantelId === null && p.jobTitleId === null) || null;
+
+  const chosen = exact || plantelOnly || jobOnly || globalPref;
+
+  if (!chosen) return DEFAULT_PREF;
+
+  return {
+    emailNewEntries: chosen.emailNewEntries,
+    emailStatusUpdates: chosen.emailStatusUpdates,
+    inAppNewEntries: chosen.inAppNewEntries,
+    inAppStatusUpdates: chosen.inAppStatusUpdates,
+    pushNewEntries: chosen.pushNewEntries,
+    pushStatusUpdates: chosen.pushStatusUpdates,
+  };
 }
 
 // ==========================================
@@ -114,8 +156,6 @@ export async function deleteJob(jobId) {
   }
 
   try {
-    // Check ownership before delete if strict scoping needed
-    // For now, relying on Dashboard filter to prevent seeing it
     await db.job.delete({ where: { id: jobId } });
     revalidatePath("/dashboard/jobs");
     return { success: true };
@@ -163,7 +203,7 @@ export async function applyJob(formData) {
     const jobId = formData.get("jobId");
     const job = await db.job.findUnique({
       where: { id: jobId },
-      include: { plantel: true },
+      include: { plantel: true, jobTitle: true },
     });
 
     if (!job) {
@@ -183,7 +223,7 @@ export async function applyJob(formData) {
       },
     });
 
-    // Candidate confirmation email
+    // Candidate confirmation email (72-hour SLA message)
     if (finalEmail) {
       const t = generateEmailTemplate("CONFIRMATION", {
         candidateName: formData.get("fullName"),
@@ -200,7 +240,7 @@ export async function applyJob(formData) {
       });
     }
 
-    // Staff notification email (Plantel users + global roles)
+    // Staff notification email + in-app + push according to preferences
     try {
       const baseEnv =
         process.env.NEXT_PUBLIC_BASE_URL ||
@@ -230,43 +270,99 @@ export async function applyJob(formData) {
         include: { role: true },
       });
 
-      const staffEmails = staffUsers
-        .map((u) => u.email)
-        .filter((email) => !!email);
+      const staffUserIds = staffUsers.map((u) => u.id);
+      const allPrefs =
+        staffUserIds.length > 0
+          ? await db.notificationPreference.findMany({
+              where: { userId: { in: staffUserIds } },
+            })
+          : [];
 
       console.log("[applyJob] Staff notification planning", {
         jobId: job.id,
         plantelId: job.plantelId,
-        staffCount: staffEmails.length,
+        staffCount: staffUsers.length,
+        prefCount: allPrefs.length,
         hasBaseUrl: !!normalizedBase,
       });
 
-      if (staffEmails.length > 0) {
-        const staffTemplate = generateEmailTemplate("NEW_APPLICATION_STAFF", {
-          candidateName: app.fullName,
-          candidateEmail: finalEmail || "",
-          candidatePhone: app.phone || "",
-          jobTitle: job.title,
-          jobDepartment: job.department || "",
-          jobType: job.type || "",
-          plantelName: job.plantel?.name || "",
-          plantelAddress: job.plantel?.address || "",
-          appliedAt: app.createdAt.toLocaleString("es-MX"),
-          cvUrl: cvAbsoluteUrl || "",
-          detailUrl,
-        });
+      const emailPromises = [];
+      const notificationOps = [];
 
-        const staffRes = await sendGmail({
-          to: staffEmails,
-          subject: staffTemplate.subject,
-          html: staffTemplate.html,
-        });
+      for (const user of staffUsers) {
+        const pref = resolveEffectivePreference(
+          user.id,
+          job.plantelId,
+          job.jobTitleId,
+          allPrefs
+        );
 
-        console.log("[applyJob] Staff email result", {
-          recipients: staffEmails.length,
-          success: staffRes?.success,
-        });
+        // In-app notification
+        if (pref.inAppNewEntries) {
+          notificationOps.push(
+            db.notification.create({
+              data: {
+                userId: user.id,
+                type: "NEW_APPLICATION",
+                title: "Nueva postulación",
+                message: `${app.fullName} se postuló a "${job.title}"`,
+                link: detailUrl,
+                applicationId: app.id,
+                jobId: job.id,
+                plantelId: job.plantelId,
+              },
+            })
+          );
+        }
+
+        // Email to staff
+        if (pref.emailNewEntries && user.email) {
+          const staffTemplate = generateEmailTemplate("NEW_APPLICATION_STAFF", {
+            candidateName: app.fullName,
+            candidateEmail: finalEmail || "",
+            candidatePhone: app.phone || "",
+            jobTitle: job.title,
+            jobDepartment: job.department || "",
+            jobType: job.type || "",
+            plantelName: job.plantel?.name || "",
+            plantelAddress: job.plantel?.address || "",
+            appliedAt: app.createdAt.toLocaleString("es-MX"),
+            cvUrl: cvAbsoluteUrl || "",
+            detailUrl,
+          });
+
+          emailPromises.push(
+            sendGmail({
+              to: user.email,
+              subject: staffTemplate.subject,
+              html: staffTemplate.html,
+            })
+          );
+        }
+
+        // Push notifications
+        if (pref.pushNewEntries) {
+          sendUserPushNotifications(user.id, {
+            title: "Nueva postulación",
+            body: `${app.fullName} - ${job.title}`,
+            url: detailUrl,
+          }).catch((err) =>
+            console.error("[applyJob] push error for user", user.id, err)
+          );
+        }
       }
+
+      if (notificationOps.length > 0) {
+        await db.$transaction(notificationOps);
+      }
+      if (emailPromises.length > 0) {
+        await Promise.allSettled(emailPromises);
+      }
+
+      console.log("[applyJob] Staff notifications completed", {
+        createdNotifications: notificationOps.length,
+        staffUsers: staffUsers.length,
+      });
     } catch (notifyError) {
       console.error("[applyJob] Staff notification error", notifyError);
     }
@@ -346,17 +442,24 @@ export async function updateApplicationStatus(
       where: { id: appId },
       include: {
         user: true,
-        job: { include: { plantel: true } },
+        job: { include: { plantel: true, jobTitle: true } },
       },
     });
 
     if (!currentApp) return { error: "No encontrado" };
 
+    const previousStatus = currentApp.status;
+    const nextStatus = data.status || previousStatus;
+    const isStatusChange =
+      typeof data.status === "string" && data.status !== previousStatus;
+
     // 1. Update Database
-    await db.application.update({ where: { id: appId }, data: data });
+    const updatedApp = await db.application.update({
+      where: { id: appId },
+      data: data,
+    });
 
     // 2. Google Calendar Integration
-    // Trigger only if a NEW valid date is set
     if (
       data.interviewDate &&
       data.interviewDate.getTime() !== currentApp.interviewDate?.getTime()
@@ -374,10 +477,10 @@ export async function updateApplicationStatus(
       });
     }
 
-    // 3. Email Notification
+    // 3. Candidate Email Notification (optional, already controlled externally)
     if (shouldSendEmail) {
       const emailTarget = currentApp.email || currentApp.user?.email;
-      const targetStatus = data.status || currentApp.status;
+      const targetStatus = nextStatus;
 
       if (emailTarget) {
         let mapLink = null;
@@ -395,6 +498,132 @@ export async function updateApplicationStatus(
         });
 
         await sendGmail({ to: emailTarget, subject: t.subject, html: t.html });
+      }
+    }
+
+    // 4. Staff notifications for STATUS_UPDATE
+    if (isStatusChange) {
+      try {
+        const baseEnv =
+          process.env.NEXT_PUBLIC_BASE_URL ||
+          process.env.APP_BASE_URL ||
+          process.env.VERCEL_URL ||
+          "";
+        let baseUrl = baseEnv || "";
+        if (baseUrl && !baseUrl.startsWith("http")) {
+          baseUrl = `https://${baseUrl}`;
+        }
+        const normalizedBase = baseUrl.replace(/\/+$/, "");
+
+        const detailUrl = normalizedBase
+          ? `${normalizedBase}/dashboard/application/${appId}`
+          : `/dashboard/application/${appId}`;
+
+        const staffUsers = await db.user.findMany({
+          where: {
+            OR: [
+              { role: { isGlobal: true } },
+              { plantels: { some: { id: currentApp.job.plantelId } } },
+            ],
+          },
+          include: { role: true },
+        });
+
+        const staffUserIds = staffUsers.map((u) => u.id);
+        const allPrefs =
+          staffUserIds.length > 0
+            ? await db.notificationPreference.findMany({
+                where: { userId: { in: staffUserIds } },
+              })
+            : [];
+
+        console.log("[StatusUpdate] Staff notify planning", {
+          appId,
+          previousStatus,
+          nextStatus,
+          staffCount: staffUsers.length,
+          prefCount: allPrefs.length,
+        });
+
+        const notificationOps = [];
+        const emailPromises = [];
+
+        for (const user of staffUsers) {
+          const pref = resolveEffectivePreference(
+            user.id,
+            currentApp.job.plantelId,
+            currentApp.job.jobTitleId,
+            allPrefs
+          );
+
+          // In-app notification
+          if (pref.inAppStatusUpdates) {
+            notificationOps.push(
+              db.notification.create({
+                data: {
+                  userId: user.id,
+                  type: "STATUS_UPDATE",
+                  title: "Actualización de estado",
+                  message: `El candidato ${updatedApp.fullName} cambió a estado "${nextStatus}".`,
+                  link: detailUrl,
+                  applicationId: updatedApp.id,
+                  jobId: currentApp.job.id,
+                  plantelId: currentApp.job.plantelId,
+                },
+              })
+            );
+          }
+
+          // Email channel
+          if (pref.emailStatusUpdates && user.email) {
+            const staffTemplate = generateEmailTemplate("NEW_APPLICATION_STAFF", {
+              // Reuse layout but text is about status change; subject is overridden below
+              candidateName: updatedApp.fullName,
+              candidateEmail: updatedApp.email || "",
+              candidatePhone: updatedApp.phone || "",
+              jobTitle: currentApp.job.title,
+              jobDepartment: currentApp.job.department || "",
+              jobType: currentApp.job.type || "",
+              plantelName: currentApp.job.plantel?.name || "",
+              plantelAddress: currentApp.job.plantel?.address || "",
+              appliedAt: updatedApp.updatedAt.toLocaleString("es-MX"),
+              cvUrl: updatedApp.cvUrl || "",
+              detailUrl,
+            });
+
+            emailPromises.push(
+              sendGmail({
+                to: user.email,
+                subject: `Estatus actualizado - ${currentApp.job.title}: ${nextStatus}`,
+                html: staffTemplate.html,
+              })
+            );
+          }
+
+          // Push notifications
+          if (pref.pushStatusUpdates) {
+            sendUserPushNotifications(user.id, {
+              title: "Cambio de estado",
+              body: `${updatedApp.fullName} → ${nextStatus}`,
+              url: detailUrl,
+            }).catch((err) =>
+              console.error("[StatusUpdate] push error for user", user.id, err)
+            );
+          }
+        }
+
+        if (notificationOps.length > 0) {
+          await db.$transaction(notificationOps);
+        }
+        if (emailPromises.length > 0) {
+          await Promise.allSettled(emailPromises);
+        }
+
+        console.log("[StatusUpdate] Staff notifications completed", {
+          createdNotifications: notificationOps.length,
+        });
+      } catch (notifyErr) {
+        console.error("[StatusUpdate] staff notify error", notifyErr);
       }
     }
 
