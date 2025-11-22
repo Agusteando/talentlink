@@ -117,30 +117,25 @@ const planteles = [
 
 /**
  * CHECKLIST ITEMS
- * Table: checklisttemplate
+ * Table: ChecklistTemplate
  */
 const checklistItems = [
-  { id: 'chk-entrevista-1', name: 'Entrevista 1', type: 'DATE', sortOrder: 1 },
-  { id: 'chk-entrevista-2', name: 'Entrevista 2', type: 'DATE', sortOrder: 2 },
-  {
-    id: 'chk-documentos-signia',
-    name: 'Documentos Signia',
-    type: 'CHECKBOX',
-    sortOrder: 3,
-  },
-  { id: 'chk-evaluatest', name: 'Evaluatest', type: 'CHECKBOX', sortOrder: 4 },
-  { id: 'chk-path', name: 'PATH', type: 'CHECKBOX', sortOrder: 5 },
+  { id: 'chk-entrevista-1', name: 'Entrevista 1', type: 'DATE',     sortOrder: 1 },
+  { id: 'chk-entrevista-2', name: 'Entrevista 2', type: 'DATE',     sortOrder: 2 },
+  { id: 'chk-documentos-signia', name: 'Documentos Signia', type: 'CHECKBOX', sortOrder: 3 },
+  { id: 'chk-evaluatest',  name: 'Evaluatest',      type: 'CHECKBOX', sortOrder: 4 },
+  { id: 'chk-path',        name: 'PATH',            type: 'CHECKBOX', sortOrder: 5 },
 ];
 
 /**
  * Load puestos from prisma/puestos.csv
  * CSV format:
- *   name
+ *   name[,category]
  *   ADMON ESCOLAR
  *   ...
  */
 function loadPuestosFromCsv() {
-  const csvPath = path.join(__dirname, 'puestos.csv'); // <— place file here
+  const csvPath = path.join(__dirname, 'puestos.csv'); // put file here
   const raw = fs.readFileSync(csvPath, 'utf8');
 
   const lines = raw
@@ -213,7 +208,7 @@ async function seedJobTitles() {
   console.log(`   Found ${puestos.length} puestos in CSV`);
 
   for (const p of puestos) {
-    await prisma.jobtitle.upsert({
+    await prisma.jobTitle.upsert({
       // name is UNIQUE in your table, so we use it as the identity
       where: { name: p.name },
       update: {
@@ -229,15 +224,15 @@ async function seedJobTitles() {
     });
   }
 
-  const count = await prisma.jobtitle.count();
-  console.log(`   ✅ jobtitle count: ${count}`);
+  const count = await prisma.jobTitle.count();
+  console.log(`   ✅ jobTitle count: ${count}`);
 }
 
 async function seedChecklistTemplates() {
   console.log('→ Seeding checklist templates…');
 
   for (const c of checklistItems) {
-    await prisma.checklisttemplate.upsert({
+    await prisma.checklistTemplate.upsert({
       where: { id: c.id }, // primary key
       update: {
         name: c.name,
@@ -255,8 +250,8 @@ async function seedChecklistTemplates() {
     });
   }
 
-  const count = await prisma.checklisttemplate.count();
-  console.log(`   ✅ checklisttemplate count: ${count}`);
+  const count = await prisma.checklistTemplate.count();
+  console.log(`   ✅ checklistTemplate count: ${count}`);
 }
 
 /**
@@ -288,5 +283,5 @@ main()
     process.exit(1);
   })
   .finally(async () => {
-    await prisma.$disconnect();
+    prisma.$disconnect();
   });

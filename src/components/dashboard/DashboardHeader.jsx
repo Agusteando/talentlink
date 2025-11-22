@@ -18,7 +18,7 @@ import {
 import { signOut } from "next-auth/react";
 import { PERMISSIONS } from "@/lib/permissions";
 
-export default function DashboardHeader({ user }) {
+export default function DashboardHeader({ user, unreadCount = 0 }) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const pathname = usePathname();
   const isActive = (path) => pathname === path;
@@ -60,8 +60,14 @@ export default function DashboardHeader({ user }) {
       label: "Alertas",
       icon: Bell,
       visible: can(PERMISSIONS.VIEW_DASHBOARD),
+      showUnreadBadge: true,
     },
   ];
+
+  const formattedUnread =
+    typeof unreadCount === "number" && unreadCount > 99
+      ? "99+"
+      : unreadCount;
 
   return (
     <header className="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-sm">
@@ -89,6 +95,8 @@ export default function DashboardHeader({ user }) {
           {navItems.map((item) => {
             if (!item.visible) return null;
             const active = isActive(item.href);
+            const isAlerts = item.showUnreadBadge;
+
             return (
               <Link
                 key={item.href}
@@ -99,7 +107,13 @@ export default function DashboardHeader({ user }) {
                     : "text-slate-500 hover:text-slate-900 hover:bg-slate-50"
                 }`}
               >
-                <item.icon size={16} /> {item.label}
+                <item.icon size={16} />
+                <span>{item.label}</span>
+                {isAlerts && unreadCount > 0 && (
+                  <span className="inline-flex items-center justify-center rounded-full bg-red-500 text-white text-[10px] font-bold px-1 min-w-[1.25rem]">
+                    {formattedUnread}
+                  </span>
+                )}
               </Link>
             );
           })}
@@ -109,7 +123,7 @@ export default function DashboardHeader({ user }) {
         <div className="flex items-center gap-3">
           <div className="text-right hidden sm:block leading-tight">
             <div className="text-xs font-bold text-slate-900">{user.name}</div>
-            <div className="text-[10px] text-slate-500 font-medium uppercase truncate max-w-[140px]">
+            <div className="text-[10px] text-slate-500 font-medium uppercase truncate max-w-[8.75rem]">
               {user.roleName}
             </div>
           </div>
@@ -138,6 +152,8 @@ export default function DashboardHeader({ user }) {
         <div className="md:hidden absolute top-16 left-0 w-full bg-white border-b border-slate-200 shadow-xl p-4 flex flex-col gap-2 animate-in slide-in-from-top-5">
           {navItems.map((item) => {
             if (!item.visible) return null;
+            const isAlerts = item.showUnreadBadge;
+
             return (
               <Link
                 key={item.href}
@@ -145,7 +161,13 @@ export default function DashboardHeader({ user }) {
                 onClick={() => setIsMenuOpen(false)}
                 className="flex items-center gap-3 p-3 rounded-lg bg-slate-50 text-slate-700 font-bold text-sm"
               >
-                <item.icon size={18} /> {item.label}
+                <item.icon size={18} />
+                <span className="flex-1">{item.label}</span>
+                {isAlerts && unreadCount > 0 && (
+                  <span className="inline-flex items-center justify-center rounded-full bg-red-500 text-white text-[10px] font-bold px-1 min-w-[1.25rem]">
+                    {formattedUnread}
+                  </span>
+                )}
               </Link>
             );
           })}

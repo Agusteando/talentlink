@@ -1,4 +1,3 @@
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -24,6 +23,10 @@ model Plantel {
   // REVISED: Many-to-Many relation with Users
   users       User[]
 
+  // Notification center relations
+  notifications           Notification[]
+  notificationPreferences NotificationPreference[]
+
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 }
@@ -33,7 +36,11 @@ model JobTitle {
   name      String   @unique
   category  String?
   isActive  Boolean  @default(true)
+
   jobs      Job[]
+
+  // Notification center relations
+  notificationPreferences NotificationPreference[]
 }
 
 model ChecklistTemplate {
@@ -72,27 +79,37 @@ model User {
 
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
+
   applications    Application[]
   comments        Comment[]
+
+  // Notification center relations
+  notifications           Notification[]
+  notificationPreferences NotificationPreference[]
+  pushSubscriptions       PushSubscription[]
 }
 
 // --- BUSINESS ---
 
 model Job {
-  id          String   @id @default(cuid())
+  id          String    @id @default(cuid())
   title       String
   jobTitleId  String?
   jobTitle    JobTitle? @relation(fields: [jobTitleId], references: [id], map: "fk_job_title")
-  description String   @db.Text
+  description String    @db.Text
   department  String
-  type        String   @default("Tiempo Completo")
-  status      String   @default("OPEN")
+  type        String    @default("Tiempo Completo")
+  status      String    @default("OPEN")
   closingDate DateTime?
   plantelId   String
-  plantel     Plantel  @relation(fields: [plantelId], references: [id], map: "fk_job_plantel")
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  plantel     Plantel   @relation(fields: [plantelId], references: [id], map: "fk_job_plantel")
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
   applications Application[]
+
+  // Notification center relations
+  notifications Notification[]
 }
 
 model Application {
@@ -114,8 +131,11 @@ model Application {
   interviewDate  DateTime?
 
   checklistValues ChecklistValue[]
+  comments        Comment[]
 
-  comments       Comment[]
+  // Notification center relations
+  notifications   Notification[]
+
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 
@@ -146,9 +166,7 @@ model Comment {
   @@index([applicationId])
 }
 
-
 /// ---- Notification Center Schema Snippet ----
-/// Merge these models/enums into your main Prisma schema.prisma.
 /// They reference existing models: User, Plantel, Job, JobTitle, Application.
 
 enum NotificationType {
@@ -177,8 +195,8 @@ model Notification {
 }
 
 model NotificationPreference {
-  id                  String   @id @default(cuid())
-  user                User     @relation(fields: [userId], references: [id])
+  id                  String    @id @default(cuid())
+  user                User      @relation(fields: [userId], references: [id])
   userId              String
 
   // Scope: null = global; plantel- or puesto- specific overrides
@@ -188,19 +206,19 @@ model NotificationPreference {
   jobTitleId          String?
 
   // Email channels
-  emailNewEntries     Boolean  @default(true)
-  emailStatusUpdates  Boolean  @default(true)
+  emailNewEntries     Boolean   @default(true)
+  emailStatusUpdates  Boolean   @default(true)
 
   // In-app notification center
-  inAppNewEntries     Boolean  @default(true)
-  inAppStatusUpdates  Boolean  @default(true)
+  inAppNewEntries     Boolean   @default(true)
+  inAppStatusUpdates  Boolean   @default(true)
 
   // Web Push channels
-  pushNewEntries      Boolean  @default(false)
-  pushStatusUpdates   Boolean  @default(false)
+  pushNewEntries      Boolean   @default(false)
+  pushStatusUpdates   Boolean   @default(false)
 
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
 
   @@unique([userId, plantelId, jobTitleId])
 }
