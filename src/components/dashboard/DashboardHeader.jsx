@@ -1,7 +1,7 @@
 
 "use client";
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
@@ -17,12 +17,23 @@ import {
 } from "lucide-react";
 import { signOut } from "next-auth/react";
 import { PERMISSIONS } from "@/lib/permissions";
+import NotificationCenter from "@/components/dashboard/NotificationCenter";
 
-export default function DashboardHeader({ user, unreadCount = 0 }) {
+export default function DashboardHeader({
+  user,
+  unreadCount = 0,
+  notifications = [],
+}) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isNotifOpen, setIsNotifOpen] = useState(false);
+  const [badgeCount, setBadgeCount] = useState(unreadCount);
   const pathname = usePathname();
   const isActive = (path) => pathname === path;
   const can = (p) => user.permissions?.includes(p);
+
+  useEffect(() => {
+    setBadgeCount(unreadCount);
+  }, [unreadCount]);
 
   const navItems = [
     {
@@ -55,22 +66,17 @@ export default function DashboardHeader({ user, unreadCount = 0 }) {
       icon: Briefcase,
       visible: can(PERMISSIONS.MANAGE_JOBS),
     },
-    {
-      href: "/dashboard/notifications",
-      label: "Alertas",
-      icon: Bell,
-      visible: can(PERMISSIONS.VIEW_DASHBOARD),
-      showUnreadBadge: true,
-    },
   ];
 
-  const formattedUnread =
-    typeof unreadCount === "number" && unreadCount > 99
-      ? "99+"
-      : unreadCount;
+  const formattedBadge =
+    typeof badgeCount === "number" && badgeCount > 99 ? "99+" : badgeCount;
+
+  const handleUnreadChange = (nextUnread) => {
+    setBadgeCount(nextUnread);
+  };
 
   return (
-    <header className="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-sm">
+    <header className="relative bg-white border-b border-slate-200 sticky top-0 z-30 shadow-sm">
       <div className="container mx-auto px-4 h-16 flex items-center justify-between">
         {/* MOBILE: Menu Button */}
         <button
@@ -95,8 +101,6 @@ export default function DashboardHeader({ user, unreadCount = 0 }) {
           {navItems.map((item) => {
             if (!item.visible) return null;
             const active = isActive(item.href);
-            const isAlerts = item.showUnreadBadge;
-
             return (
               <Link
                 key={item.href}
@@ -109,18 +113,31 @@ export default function DashboardHeader({ user, unreadCount = 0 }) {
               >
                 <item.icon size={16} />
                 <span>{item.label}</span>
-                {isAlerts && unreadCount > 0 && (
-                  <span className="inline-flex items-center justify-center rounded-full bg-red-500 text-white text-[10px] font-bold px-1 min-w-[1.25rem]">
-                    {formattedUnread}
-                  </span>
-                )}
               </Link>
             );
           })}
         </nav>
 
-        {/* USER CONTROLS */}
+        {/* USER + ACTIONS */}
         <div className="flex items-center gap-3">
+          {/* Notificaciones (Bell) */}
+          {can(PERMISSIONS.VIEW_DASHBOARD) && (
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setIsNotifOpen((prev) => !prev)}
+                className="relative flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 hover:text-slate-900 hover:bg-slate-50 shadow-sm transition"
+              >
+                <Bell size={18} />
+                {badgeCount > 0 && (
+                  <span className="absolute -top-1.5 -right-1.5 inline-flex items-center justify-center rounded-full bg-red-500 text-white text-[9px] font-bold px-1 min-w-[1.2rem]">
+                    {formattedBadge}
+                  </span>
+                )}
+              </button>
+            </div>
+          )}
+
           <div className="text-right hidden sm:block leading-tight">
             <div className="text-xs font-bold text-slate-900">{user.name}</div>
             <div className="text-[10px] text-slate-500 font-medium uppercase truncate max-w-[8.75rem]">
@@ -152,8 +169,6 @@ export default function DashboardHeader({ user, unreadCount = 0 }) {
         <div className="md:hidden absolute top-16 left-0 w-full bg-white border-b border-slate-200 shadow-xl p-4 flex flex-col gap-2 animate-in slide-in-from-top-5">
           {navItems.map((item) => {
             if (!item.visible) return null;
-            const isAlerts = item.showUnreadBadge;
-
             return (
               <Link
                 key={item.href}
@@ -163,14 +178,19 @@ export default function DashboardHeader({ user, unreadCount = 0 }) {
               >
                 <item.icon size={18} />
                 <span className="flex-1">{item.label}</span>
-                {isAlerts && unreadCount > 0 && (
-                  <span className="inline-flex items-center justify-center rounded-full bg-red-500 text-white text-[10px] font-bold px-1 min-w-[1.25rem]">
-                    {formattedUnread}
-                  </span>
-                )}
               </Link>
             );
           })}
+        </div>
+      )}
+
+      {/* NOTIFICATION DROPDOWN */}
+      {isNotifOpen && (
+        <div className="absolute right-2 top-16 w-full max-w-md px-2 md:px-4 pb-4">
+          <NotificationCenter
+            initialNotifications={notifications}
+            onUnreadChange={handleUnreadChange}
+          />
         </div>
       )}
     </header>

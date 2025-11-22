@@ -4,15 +4,10 @@
 import { db } from "@/lib/db";
 import { auth } from "@/auth";
 import { revalidatePath } from "next/cache";
-
-const DEFAULT_PREF = {
-  emailNewEntries: true,
-  emailStatusUpdates: true,
-  inAppNewEntries: true,
-  inAppStatusUpdates: true,
-  pushNewEntries: false,
-  pushStatusUpdates: false,
-};
+import {
+  DEFAULT_NOTIFICATION_CHANNELS,
+  normalizeNotificationChannels,
+} from "@/lib/notification-preferences";
 
 export async function saveNotificationPreferences(preferences) {
   const session = await auth();
@@ -35,35 +30,15 @@ export async function saveNotificationPreferences(preferences) {
 
     const existingById = new Map(existing.map((p) => [p.id, p]));
 
-    const normalizedIncoming = incoming.map((p) => ({
-      id: p.id || undefined,
-      plantelId: p.plantelId || null,
-      jobTitleId: p.jobTitleId || null,
-      emailNewEntries:
-        typeof p.emailNewEntries === "boolean"
-          ? p.emailNewEntries
-          : DEFAULT_PREF.emailNewEntries,
-      emailStatusUpdates:
-        typeof p.emailStatusUpdates === "boolean"
-          ? p.emailStatusUpdates
-          : DEFAULT_PREF.emailStatusUpdates,
-      inAppNewEntries:
-        typeof p.inAppNewEntries === "boolean"
-          ? p.inAppNewEntries
-          : DEFAULT_PREF.inAppNewEntries,
-      inAppStatusUpdates:
-        typeof p.inAppStatusUpdates === "boolean"
-          ? p.inAppStatusUpdates
-          : DEFAULT_PREF.inAppStatusUpdates,
-      pushNewEntries:
-        typeof p.pushNewEntries === "boolean"
-          ? p.pushNewEntries
-          : DEFAULT_PREF.pushNewEntries,
-      pushStatusUpdates:
-        typeof p.pushStatusUpdates === "boolean"
-          ? p.pushStatusUpdates
-          : DEFAULT_PREF.pushStatusUpdates,
-    }));
+    const normalizedIncoming = incoming.map((p) => {
+      const channels = normalizeNotificationChannels(p);
+      return {
+        id: p.id || undefined,
+        plantelId: p.plantelId || null,
+        jobTitleId: p.jobTitleId || null,
+        ...channels,
+      };
+    });
 
     const incomingIds = new Set(
       normalizedIncoming.filter((p) => p.id).map((p) => p.id)
@@ -75,7 +50,6 @@ export async function saveNotificationPreferences(preferences) {
 
     const ops = [];
 
-    // Deletes
     if (toDeleteIds.length > 0) {
       ops.push(
         db.notificationPreference.deleteMany({
@@ -84,7 +58,6 @@ export async function saveNotificationPreferences(preferences) {
       );
     }
 
-    // Upserts/creates
     for (const pref of normalizedIncoming) {
       if (pref.id && existingById.has(pref.id)) {
         ops.push(

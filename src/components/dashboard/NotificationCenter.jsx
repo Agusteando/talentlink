@@ -3,7 +3,10 @@
 
 import { useState, useTransition } from "react";
 import Link from "next/link";
-import { markNotificationRead, markAllNotificationsRead } from "@/actions/notification-actions";
+import {
+  markNotificationRead,
+  markAllNotificationsRead,
+} from "@/actions/notification-actions";
 import { formatDistanceToNow } from "date-fns";
 import { es } from "date-fns/locale";
 import {
@@ -18,16 +21,34 @@ import {
 import { useRouter } from "next/navigation";
 import { toast } from "react-hot-toast";
 
-export default function NotificationCenter({ initialNotifications }) {
+export default function NotificationCenter({
+  initialNotifications,
+  onUnreadChange,
+}) {
   const [notifications, setNotifications] = useState(initialNotifications || []);
   const [isPending, startTransition] = useTransition();
   const router = useRouter();
 
   const unreadCount = notifications.filter((n) => !n.readAt).length;
 
+  const updateUnreadAndState = (updater) => {
+    setNotifications((prev) => {
+      const next = updater(prev);
+      if (onUnreadChange) {
+        const nextUnread = next.filter((n) => !n.readAt).length;
+        onUnreadChange(nextUnread);
+      }
+      return next;
+    });
+  };
+
   const handleMarkRead = (id) => {
-    setNotifications((prev) =>
-      prev.map((n) => (n.id === id ? { ...n, readAt: new Date().toISOString() } : n))
+    updateUnreadAndState((prev) =>
+      prev.map((n) =>
+        n.id === id && !n.readAt
+          ? { ...n, readAt: new Date().toISOString() }
+          : n
+      )
     );
 
     startTransition(async () => {
@@ -39,8 +60,12 @@ export default function NotificationCenter({ initialNotifications }) {
   };
 
   const handleMarkAll = () => {
-    setNotifications((prev) =>
-      prev.map((n) => (n.readAt ? n : { ...n, readAt: new Date().toISOString() }))
+    if (unreadCount === 0) return;
+
+    updateUnreadAndState((prev) =>
+      prev.map((n) =>
+        n.readAt ? n : { ...n, readAt: new Date().toISOString() }
+      )
     );
 
     startTransition(async () => {
@@ -59,8 +84,11 @@ export default function NotificationCenter({ initialNotifications }) {
     router.push(target);
   };
 
+  const formattedUnread =
+    typeof unreadCount === "number" && unreadCount > 99 ? "99+" : unreadCount;
+
   return (
-    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+    <div className="bg-white rounded-2xl border border-slate-200 shadow-xl overflow-hidden max-h-[480px] flex flex-col">
       <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50 px-4 py-3">
         <div className="flex items-center gap-2">
           <div className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-900 text-white">
@@ -72,7 +100,7 @@ export default function NotificationCenter({ initialNotifications }) {
             </p>
             <p className="text-xs text-slate-400">
               {unreadCount > 0
-                ? `${unreadCount} pendientes de revisión`
+                ? `${formattedUnread} pendientes de revisión`
                 : "Todo al día"}
             </p>
           </div>
@@ -89,11 +117,11 @@ export default function NotificationCenter({ initialNotifications }) {
       </div>
 
       {notifications.length === 0 ? (
-        <div className="p-6 text-center text-sm text-slate-400">
+        <div className="p-6 text-center text-sm text-slate-400 flex-1 flex items-center justify-center">
           No tienes notificaciones todavía.
         </div>
       ) : (
-        <ul className="divide-y divide-slate-100">
+        <ul className="divide-y divide-slate-100 flex-1 overflow-y-auto">
           {notifications.map((n) => {
             const isUnread = !n.readAt;
             const created = new Date(n.createdAt);
@@ -109,7 +137,7 @@ export default function NotificationCenter({ initialNotifications }) {
                 }`}
                 onClick={() => handleOpen(n)}
               >
-                <div className="mt-1">
+                <div className="mt-1 shrink-0">
                   {isUnread ? (
                     <Circle className="text-blue-500" size={14} />
                   ) : (
@@ -122,7 +150,10 @@ export default function NotificationCenter({ initialNotifications }) {
                       {n.title}
                     </p>
                     <span className="text-[10px] text-slate-400 whitespace-nowrap">
-                      {formatDistanceToNow(created, { addSuffix: true, locale: es })}
+                      {formatDistanceToNow(created, {
+                        addSuffix: true,
+                        locale: es,
+                      })}
                     </span>
                   </div>
                   <p className="mt-0.5 text-xs text-slate-600 line-clamp-2">
@@ -154,15 +185,22 @@ export default function NotificationCenter({ initialNotifications }) {
         </ul>
       )}
 
-      <div className="border-t border-slate-100 bg-slate-50 px-4 py-2 text-[11px] text-slate-400 text-center">
-        Ajusta tus preferencias en{" "}
+      <div className="border-t border-slate-100 bg-slate-50 px-4 py-2 text-[11px] text-slate-400 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Link
+            href="/dashboard/notifications"
+            className="font-semibold text-blue-600 hover:underline flex items-center gap-1"
+          >
+            Ver todas
+            <ArrowRight size={11} />
+          </Link>
+        </div>
         <Link
           href="/dashboard/settings/notifications"
           className="font-semibold text-blue-600 hover:underline"
         >
-          Configuración &gt; Notificaciones personales
+          Configurar
         </Link>
-        .
       </div>
     </div>
   );

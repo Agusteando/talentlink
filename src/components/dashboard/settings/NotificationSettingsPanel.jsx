@@ -1,7 +1,11 @@
 
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import {
+  useEffect,
+  useState,
+  useTransition,
+} from "react";
 import { saveNotificationPreferences } from "@/actions/notification-actions";
 import {
   Bell,
@@ -59,9 +63,9 @@ export default function NotificationSettingsPanel({
   const [isSaving, startSaving] = useTransition();
   const [isRegisteringPush, setIsRegisteringPush] = useState(false);
   const [pushEnabled, setPushEnabled] = useState(false);
+  const [showAdvanced, setShowAdvanced] = useState(false);
 
   useEffect(() => {
-    // Try to detect existing subscription for label purposes
     if (typeof window === "undefined" || !("serviceWorker" in navigator)) return;
 
     navigator.serviceWorker.ready
@@ -172,6 +176,75 @@ export default function NotificationSettingsPanel({
     }
   };
 
+  // --- Quick summary & global toggles ---
+
+  const ruleCount = rows.length;
+  const hasGlobalRule = rows.some(
+    (r) => !r.plantelId && !r.jobTitleId
+  );
+
+  let scopeLabel = "";
+  if (ruleCount === 0) {
+    scopeLabel =
+      "Aún no tienes reglas definidas. Se aplicará el comportamiento por defecto de TalentLink.";
+  } else if (hasGlobalRule) {
+    scopeLabel = "Todos tus planteles y todos los puestos.";
+  } else if (ruleCount === 1) {
+    const r = rows[0];
+    const plantelText = r.plantelId
+      ? plantels.find((p) => p.id === r.plantelId)?.name || "Plantel específico"
+      : "Todos los planteles";
+    const jobText = r.jobTitleId
+      ? jobTitles.find((t) => t.id === r.jobTitleId)?.name || "Puesto específico"
+      : "Todos los puestos";
+    scopeLabel = `${plantelText} • ${jobText}`;
+  } else {
+    scopeLabel = "Varias reglas por plantel y/o puesto (modo avanzado).";
+  }
+
+  const allEmailOn =
+    ruleCount > 0 &&
+    rows.every((r) => r.emailNewEntries && r.emailStatusUpdates);
+  const allPanelOn =
+    ruleCount > 0 &&
+    rows.every((r) => r.inAppNewEntries && r.inAppStatusUpdates);
+  const allPushOn =
+    ruleCount > 0 &&
+    rows.every((r) => r.pushNewEntries && r.pushStatusUpdates);
+
+  const toggleAllEmail = () => {
+    const next = !allEmailOn;
+    setRows((prev) =>
+      prev.map((r) => ({
+        ...r,
+        emailNewEntries: next,
+        emailStatusUpdates: next,
+      }))
+    );
+  };
+
+  const toggleAllPanel = () => {
+    const next = !allPanelOn;
+    setRows((prev) =>
+      prev.map((r) => ({
+        ...r,
+        inAppNewEntries: next,
+        inAppStatusUpdates: next,
+      }))
+    );
+  };
+
+  const toggleAllPush = () => {
+    const next = !allPushOn;
+    setRows((prev) =>
+      prev.map((r) => ({
+        ...r,
+        pushNewEntries: next,
+        pushStatusUpdates: next,
+      }))
+    );
+  };
+
   return (
     <div className="space-y-6">
       {/* Push registration banner */}
@@ -207,217 +280,277 @@ export default function NotificationSettingsPanel({
         </button>
       </div>
 
-      {/* Preferences table */}
-      <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-        <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50 px-4 py-3">
-          <div className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-50 text-blue-600">
-              <Bell size={16} />
-            </div>
-            <div>
-              <p className="text-sm font-bold text-slate-800">
-                Reglas de notificación
-              </p>
-              <p className="text-xs text-slate-400">
-                Crea reglas por plantel y/o puesto. La coincidencia exacta
-                tiene prioridad sobre reglas globales.
-              </p>
-            </div>
+      {/* Quick summary + global channel toggles */}
+      <div className="rounded-2xl border border-slate-200 bg-white shadow-sm p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div className="flex items-start gap-3">
+          <div className="mt-0.5 flex h-9 w-9 items-center justify-center rounded-full bg-blue-50 text-blue-600">
+            <Bell size={16} />
           </div>
-          <button
-            type="button"
-            onClick={addRow}
-            className="inline-flex items-center gap-1 rounded-lg bg-slate-900 px-3 py-2 text-xs font-bold text-white hover:bg-blue-700 transition shadow-sm"
-          >
-            <Plus size={14} /> Nueva regla
-          </button>
+          <div>
+            <p className="text-sm font-bold text-slate-800">
+              Alertas principales
+            </p>
+            <p className="text-xs text-slate-500">
+              Por defecto recibirás avisos para tu(s) plantel(es) y todos los
+              puestos. Puedes ajustar los canales aquí.
+            </p>
+            <p className="mt-2 text-[11px] text-slate-400">{scopeLabel}</p>
+          </div>
         </div>
+        <div className="flex flex-wrap items-center gap-2 justify-end">
+          <QuickToggle
+            label="Emails"
+            icon={Mail}
+            active={allEmailOn}
+            onClick={toggleAllEmail}
+          />
+          <QuickToggle
+            label="Panel"
+            icon={Monitor}
+            active={allPanelOn}
+            onClick={toggleAllPanel}
+          />
+          <QuickToggle
+            label="Push"
+            icon={Wifi}
+            active={allPushOn}
+            onClick={toggleAllPush}
+          />
+        </div>
+      </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-xs">
-            <thead className="bg-slate-50 text-slate-500 uppercase tracking-wide">
-              <tr>
-                <th className="px-3 py-2 text-left">Plantel</th>
-                <th className="px-3 py-2 text-left">Puesto</th>
-                <th className="px-3 py-2 text-center">
-                  <div className="flex flex-col items-center gap-0.5">
-                    <Mail size={12} /> Nuevas
-                  </div>
-                </th>
-                <th className="px-3 py-2 text-center">
-                  <div className="flex flex-col items-center gap-0.5">
-                    <Mail size={12} /> Estatus
-                  </div>
-                </th>
-                <th className="px-3 py-2 text-center">
-                  <div className="flex flex-col items-center gap-0.5">
-                    <Monitor size={12} /> Nuevas
-                  </div>
-                </th>
-                <th className="px-3 py-2 text-center">
-                  <div className="flex flex-col items-center gap-0.5">
-                    <Monitor size={12} /> Estatus
-                  </div>
-                </th>
-                <th className="px-3 py-2 text-center">
-                  <div className="flex flex-col items-center gap-0.5">
-                    <Wifi size={12} /> Nuevas
-                  </div>
-                </th>
-                <th className="px-3 py-2 text-center">
-                  <div className="flex flex-col items-center gap-0.5">
-                    <Wifi size={12} /> Estatus
-                  </div>
-                </th>
-                <th className="px-3 py-2 text-right"></th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {rows.length === 0 && (
+      {/* Advanced section toggle */}
+      <div className="flex items-center justify-between">
+        <p className="text-[11px] text-slate-400">
+          ¿Necesitas reglas distintas por plantel o puesto específico? Usa las
+          opciones avanzadas.
+        </p>
+        <button
+          type="button"
+          onClick={() => setShowAdvanced((prev) => !prev)}
+          className="text-[11px] font-bold text-blue-600 hover:text-blue-700 flex items-center gap-1"
+        >
+          {showAdvanced ? (
+            <>
+              <XCircle size={11} /> Ocultar avanzadas
+            </>
+          ) : (
+            <>
+              <Plus size={11} /> Mostrar avanzadas
+            </>
+          )}
+        </button>
+      </div>
+
+      {/* Advanced grid (optional) */}
+      {showAdvanced && (
+        <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+          <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50 px-4 py-3">
+            <div className="flex items-center gap-2">
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-50 text-blue-600">
+                <Bell size={16} />
+              </div>
+              <div>
+                <p className="text-sm font-bold text-slate-800">
+                  Reglas avanzadas
+                </p>
+                <p className="text-xs text-slate-400">
+                  Ajusta canales de notificación por plantel y/o puesto. La
+                  coincidencia más específica tiene prioridad.
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={addRow}
+              className="inline-flex items-center gap-1 rounded-lg bg-slate-900 px-3 py-2 text-xs font-bold text-white hover:bg-blue-700 transition shadow-sm"
+            >
+              <Plus size={14} /> Nueva regla
+            </button>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead className="bg-slate-50 text-slate-500 uppercase tracking-wide">
                 <tr>
-                  <td
-                    colSpan="9"
-                    className="px-4 py-6 text-center text-slate-400"
-                  >
-                    Aún no tienes reglas configuradas. Agrega al menos una
-                    regla global o por plantel.
-                  </td>
+                  <th className="px-3 py-2 text-left">Plantel</th>
+                  <th className="px-3 py-2 text-left">Puesto</th>
+                  <th className="px-3 py-2 text-center">
+                    <div className="flex flex-col items-center gap-0.5">
+                      <Mail size={12} /> Nuevas
+                    </div>
+                  </th>
+                  <th className="px-3 py-2 text-center">
+                    <div className="flex flex-col items-center gap-0.5">
+                      <Mail size={12} /> Estatus
+                    </div>
+                  </th>
+                  <th className="px-3 py-2 text-center">
+                    <div className="flex flex-col items-center gap-0.5">
+                      <Monitor size={12} /> Nuevas
+                    </div>
+                  </th>
+                  <th className="px-3 py-2 text-center">
+                    <div className="flex flex-col items-center gap-0.5">
+                      <Monitor size={12} /> Estatus
+                    </div>
+                  </th>
+                  <th className="px-3 py-2 text-center">
+                    <div className="flex flex-col items-center gap-0.5">
+                      <Wifi size={12} /> Nuevas
+                    </div>
+                  </th>
+                  <th className="px-3 py-2 text-center">
+                    <div className="flex flex-col items-center gap-0.5">
+                      <Wifi size={12} /> Estatus
+                    </div>
+                  </th>
+                  <th className="px-3 py-2 text-right"></th>
                 </tr>
-              )}
-              {rows.map((row, index) => (
-                <tr key={index} className="hover:bg-slate-50/40">
-                  <td className="px-3 py-2 min-w-[160px]">
-                    <select
-                      value={row.plantelId}
-                      onChange={(e) =>
-                        updateRow(index, { plantelId: e.target.value })
-                      }
-                      className="w-full rounded border border-slate-200 bg-white px-2 py-1 text-xs"
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {rows.length === 0 && (
+                  <tr>
+                    <td
+                      colSpan="9"
+                      className="px-4 py-6 text-center text-slate-400"
                     >
-                      <option value="">Todos los planteles</option>
-                      {plantels.map((p) => (
-                        <option key={p.id} value={p.id}>
-                          {p.name}
-                        </option>
-                      ))}
-                    </select>
-                  </td>
-                  <td className="px-3 py-2 min-w-[180px]">
-                    <select
-                      value={row.jobTitleId}
-                      onChange={(e) =>
-                        updateRow(index, { jobTitleId: e.target.value })
-                      }
-                      className="w-full rounded border border-slate-200 bg-white px-2 py-1 text-xs"
-                    >
-                      <option value="">Todos los puestos</option>
-                      {jobTitles.map((t) => (
-                        <option key={t.id} value={t.id}>
-                          {t.name}
-                        </option>
-                      ))}
-                    </select>
-                  </td>
+                      Aún no tienes reglas configuradas. Agrega al menos una
+                      regla global o por plantel.
+                    </td>
+                  </tr>
+                )}
+                {rows.map((row, index) => (
+                  <tr key={index} className="hover:bg-slate-50/40">
+                    <td className="px-3 py-2 min-w-[160px]">
+                      <select
+                        value={row.plantelId}
+                        onChange={(e) =>
+                          updateRow(index, { plantelId: e.target.value })
+                        }
+                        className="w-full rounded border border-slate-200 bg-white px-2 py-1 text-xs"
+                      >
+                        <option value="">Todos los planteles</option>
+                        {plantels.map((p) => (
+                          <option key={p.id} value={p.id}>
+                            {p.name}
+                          </option>
+                        ))}
+                      </select>
+                    </td>
+                    <td className="px-3 py-2 min-w-[180px]">
+                      <select
+                        value={row.jobTitleId}
+                        onChange={(e) =>
+                          updateRow(index, { jobTitleId: e.target.value })
+                        }
+                        className="w-full rounded border border-slate-200 bg-white px-2 py-1 text-xs"
+                      >
+                        <option value="">Todos los puestos</option>
+                        {jobTitles.map((t) => (
+                          <option key={t.id} value={t.id}>
+                            {t.name}
+                          </option>
+                        ))}
+                      </select>
+                    </td>
 
-                  {/* Email new */}
-                  <td className="px-3 py-2 text-center">
-                    <TogglePill
-                      active={row.emailNewEntries}
-                      onClick={() =>
-                        updateRow(index, {
-                          emailNewEntries: !row.emailNewEntries,
-                        })
-                      }
-                    />
-                  </td>
-                  {/* Email status */}
-                  <td className="px-3 py-2 text-center">
-                    <TogglePill
-                      active={row.emailStatusUpdates}
-                      onClick={() =>
-                        updateRow(index, {
-                          emailStatusUpdates: !row.emailStatusUpdates,
-                        })
-                      }
-                    />
-                  </td>
-                  {/* In-app new */}
-                  <td className="px-3 py-2 text-center">
-                    <TogglePill
-                      active={row.inAppNewEntries}
-                      onClick={() =>
-                        updateRow(index, {
-                          inAppNewEntries: !row.inAppNewEntries,
-                        })
-                      }
-                    />
-                  </td>
-                  {/* In-app status */}
-                  <td className="px-3 py-2 text-center">
-                    <TogglePill
-                      active={row.inAppStatusUpdates}
-                      onClick={() =>
-                        updateRow(index, {
-                          inAppStatusUpdates: !row.inAppStatusUpdates,
-                        })
-                      }
-                    />
-                  </td>
-                  {/* Push new */}
-                  <td className="px-3 py-2 text-center">
-                    <TogglePill
-                      active={row.pushNewEntries}
-                      onClick={() =>
-                        updateRow(index, {
-                          pushNewEntries: !row.pushNewEntries,
-                        })
-                      }
-                    />
-                  </td>
-                  {/* Push status */}
-                  <td className="px-3 py-2 text-center">
-                    <TogglePill
-                      active={row.pushStatusUpdates}
-                      onClick={() =>
-                        updateRow(index, {
-                          pushStatusUpdates: !row.pushStatusUpdates,
-                        })
-                      }
-                    />
-                  </td>
+                    {/* Email new */}
+                    <td className="px-3 py-2 text-center">
+                      <TogglePill
+                        active={row.emailNewEntries}
+                        onClick={() =>
+                          updateRow(index, {
+                            emailNewEntries: !row.emailNewEntries,
+                          })
+                        }
+                      />
+                    </td>
+                    {/* Email status */}
+                    <td className="px-3 py-2 text-center">
+                      <TogglePill
+                        active={row.emailStatusUpdates}
+                        onClick={() =>
+                          updateRow(index, {
+                            emailStatusUpdates: !row.emailStatusUpdates,
+                          })
+                        }
+                      />
+                    </td>
+                    {/* In-app new */}
+                    <td className="px-3 py-2 text-center">
+                      <TogglePill
+                        active={row.inAppNewEntries}
+                        onClick={() =>
+                          updateRow(index, {
+                            inAppNewEntries: !row.inAppNewEntries,
+                          })
+                        }
+                      />
+                    </td>
+                    {/* In-app status */}
+                    <td className="px-3 py-2 text-center">
+                      <TogglePill
+                        active={row.inAppStatusUpdates}
+                        onClick={() =>
+                          updateRow(index, {
+                            inAppStatusUpdates: !row.inAppStatusUpdates,
+                          })
+                        }
+                      />
+                    </td>
+                    {/* Push new */}
+                    <td className="px-3 py-2 text-center">
+                      <TogglePill
+                        active={row.pushNewEntries}
+                        onClick={() =>
+                          updateRow(index, {
+                            pushNewEntries: !row.pushNewEntries,
+                          })
+                        }
+                      />
+                    </td>
+                    {/* Push status */}
+                    <td className="px-3 py-2 text-center">
+                      <TogglePill
+                        active={row.pushStatusUpdates}
+                        onClick={() =>
+                          updateRow(index, {
+                            pushStatusUpdates: !row.pushStatusUpdates,
+                          })
+                        }
+                      />
+                    </td>
 
-                  <td className="px-3 py-2 text-right">
-                    <button
-                      type="button"
-                      onClick={() => removeRow(index)}
-                      className="inline-flex items-center justify-center rounded-full p-1.5 text-slate-300 hover:text-red-600 hover:bg-red-50 transition"
-                      title="Eliminar regla"
-                    >
-                      <Trash2 size={14} />
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                    <td className="px-3 py-2 text-right">
+                      <button
+                        type="button"
+                        onClick={() => removeRow(index)}
+                        className="inline-flex items-center justify-center rounded-full p-1.5 text-slate-300 hover:text-red-600 hover:bg-red-50 transition"
+                        title="Eliminar regla"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
+      )}
 
-        <div className="flex items-center justify-between border-t border-slate-100 bg-slate-50 px-4 py-3">
-          <p className="text-[11px] text-slate-400">
-            Si una postulación coincide con varias reglas, se aplicará primero
-            la combinación más específica (plantel + puesto), luego sólo
-            plantel/puesto y finalmente la regla global.
-          </p>
-          <button
-            type="button"
-            onClick={handleSave}
-            disabled={isSaving}
-            className="inline-flex items-center gap-2 rounded-lg bg-slate-900 px-4 py-2 text-xs font-bold text-white hover:bg-blue-700 transition shadow-sm disabled:opacity-70"
-          >
-            {isSaving && <Loader2 size={14} className="animate-spin" />}
-            Guardar preferencias
-          </button>
-        </div>
+      {/* Save button (always visible) */}
+      <div className="flex justify-end">
+        <button
+          type="button"
+          onClick={handleSave}
+          disabled={isSaving}
+          className="inline-flex items-center gap-2 rounded-lg bg-slate-900 px-4 py-2 text-xs font-bold text-white hover:bg-blue-700 transition shadow-sm disabled:opacity-70"
+        >
+          {isSaving && <Loader2 size={14} className="animate-spin" />}
+          Guardar preferencias
+        </button>
       </div>
     </div>
   );
@@ -435,6 +568,23 @@ function TogglePill({ active, onClick }) {
       }`}
     >
       {active ? <CheckCircle2 size={11} /> : <XCircle size={11} />}
+    </button>
+  );
+}
+
+function QuickToggle({ label, icon: Icon, active, onClick }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[11px] font-bold transition ${
+        active
+          ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+          : "border-slate-200 bg-slate-50 text-slate-500"
+      }`}
+    >
+      <Icon size={11} />
+      {label}
     </button>
   );
 }

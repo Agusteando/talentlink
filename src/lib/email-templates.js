@@ -1,6 +1,19 @@
 
-export function generateEmailTemplate(type, data) {
-  const { candidateName, jobTitle, customMessage } = data || {};
+export function generateEmailTemplate(type, data = {}) {
+  const {
+    candidateName,
+    jobTitle,
+    customMessage,
+    jobDepartment,
+    jobType,
+    plantelName,
+    plantelAddress,
+    appliedAt,
+    candidateEmail,
+    candidatePhone,
+    cvUrl,
+    detailUrl,
+  } = data;
 
   const primaryColor = "#0f172a"; // Slate 900
   const fontFamily = "'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
@@ -19,190 +32,134 @@ export function generateEmailTemplate(type, data) {
     case "CONFIRMATION":
       subject = "Hemos recibido tu postulación";
       bodyContent = `
-          <h2 style="color: #334155; font-family: ${fontFamily};">Hola, ${candidateName || "candidato/a"}</h2>
-          <p style="color: #475569; font-family: ${fontFamily}; font-size: 14px;">
-            Gracias por postularte a la vacante <strong>${jobTitle || ""}</strong> en IECS-IEDIS.
-          </p>
-          <p style="color: #475569; font-family: ${fontFamily}; font-size: 14px;">
-            <strong>Tu solicitud ha sido recibida correctamente</strong> y será revisada por nuestro equipo dentro de las próximas 
-            <strong>72 horas hábiles</strong>.
-          </p>
-          <p style="color: #475569; font-family: ${fontFamily}; font-size: 14px;">
-            En caso de que tu perfil avance a la siguiente etapa, nos pondremos en contacto contigo por correo electrónico para coordinar los siguientes pasos.
-          </p>
-          <p style="color: #94a3b8; font-family: ${fontFamily}; font-size: 12px; margin-top: 24px;">
-            No es necesario responder a este correo. Conserva este mensaje como comprobante de tu postulación.
-          </p>
+          <h2 style="color: #334155;">Hola, ${candidateName}</h2>
+          <p>Confirmamos la recepción de tu CV para la vacante: <strong>${jobTitle}</strong>.</p>
+          <p>Nos tomamos muy en serio cada perfil. Nuestro equipo de Recursos Humanos revisará tu información y, si tu experiencia se alinea con lo que necesitamos, nos pondremos en contacto contigo por correo o teléfono en los próximos días.</p>
         `;
       break;
 
     case "INTERVIEW":
-      subject = `Actualización de proceso: ${jobTitle || ""}`;
+      subject = `Actualización de proceso: ${jobTitle}`;
       bodyContent = `
-          <h2 style="color: #2563eb; font-family: ${fontFamily};">Siguientes Pasos</h2>
-          <p style="color: #475569; font-family: ${fontFamily}; font-size: 14px;">Hola <strong>${candidateName || "candidato/a"}</strong>,</p>
-          <p style="color: #475569; font-family: ${fontFamily}; font-size: 14px;">
-            Tu perfil nos ha parecido muy interesante. Nos gustaría invitarte a una entrevista para conocerte mejor y platicar sobre la posición de ${jobTitle || ""}.
-          </p>
-          <p style="color: #475569; font-family: ${fontFamily}; font-size: 14px;">
-            Pronto recibirás una llamada o mensaje para coordinar la agenda.
-          </p>
+          <h2 style="color: #2563eb;">Siguientes pasos</h2>
+          <p>Hola <strong>${candidateName}</strong>,</p>
+          <p>Tu perfil nos ha parecido muy interesante. Nos gustaría invitarte a una entrevista para conocerte mejor y platicar sobre la posición de <strong>${jobTitle}</strong>.</p>
+          <p>Pronto recibirás una llamada o mensaje para coordinar la agenda.</p>
         `;
       break;
 
     case "HIRED":
       subject = "¡Bienvenido al equipo!";
       bodyContent = `
-          <h2 style="color: #059669; font-family: ${fontFamily};">¡Felicidades!</h2>
-          <p style="color: #475569; font-family: ${fontFamily}; font-size: 14px;">
-            Estimado/a <strong>${candidateName || "candidato/a"}</strong>,
-          </p>
-          <p style="color: #475569; font-family: ${fontFamily}; font-size: 14px;">
-            Es un placer informarte que has sido seleccionado para la posición de <strong>${jobTitle || ""}</strong>.
-          </p>
-          <p style="color: #475569; font-family: ${fontFamily}; font-size: 14px;">
-            Bienvenido a la comunidad IECS-IEDIS. Recursos Humanos se pondrá en contacto contigo para los trámites de ingreso.
-          </p>
+          <h2 style="color: #059669;">¡Felicidades!</h2>
+          <p>Estimado/a <strong>${candidateName}</strong>,</p>
+          <p>Es un placer informarte que has sido seleccionado para la posición de <strong>${jobTitle}</strong>.</p>
+          <p>Bienvenido a la comunidad IECS-IEDIS. Recursos Humanos se pondrá en contacto contigo para los trámites de ingreso.</p>
         `;
       break;
 
-    // SOFT REJECTION / TALENT POOL
     case "TALENT_POOL":
       subject = "Estado de tu postulación";
       bodyContent = `
-          <p style="color: #475569; font-family: ${fontFamily}; font-size: 14px;">
-            Hola <strong>${candidateName || "candidato/a"}</strong>,
-          </p>
-          <p style="color: #475569; font-family: ${fontFamily}; font-size: 14px;">
-            Gracias por el tiempo dedicado al proceso para la vacante de <strong>${jobTitle || ""}</strong>.
-          </p>
-          <p style="color: #475569; font-family: ${fontFamily}; font-size: 14px;">
-            Aunque en esta ocasión hemos decidido avanzar con otro perfil para esta vacante específica,
-            <strong>nos ha gustado mucho tu trayectoria</strong>.
-          </p>
-          <p style="color: #475569; font-family: ${fontFamily}; font-size: 14px;">
-            Hemos guardado tu CV en nuestra <strong>Cartera de Talento Preferente</strong>. Te tendremos en cuenta prioritariamente para futuras aperturas en este u otros planteles de nuestra red.
-          </p>
-          <p style="color: #475569; font-family: ${fontFamily}; font-size: 14px;">
-            ¡Esperamos contactarte pronto!
-          </p>
+          <p>Hola <strong>${candidateName}</strong>,</p>
+          <p>Gracias por el tiempo dedicado al proceso para la vacante de <strong>${jobTitle}</strong>.</p>
+          <p>Aunque en esta ocasión hemos decidido avanzar con otro perfil para esta vacante específica, <strong>nos ha gustado mucho tu trayectoria</strong>.</p>
+          <p>Hemos guardado tu CV en nuestra <strong>Cartera de Talento Preferente</strong>. Te tendremos en cuenta prioritariamente para futuras aperturas en este u otros planteles de nuestra red.</p>
+          <p>¡Esperamos contactarte pronto!</p>
         `;
       break;
 
     case "REJECTED":
-      // Even strict rejection is polite
       subject = "Actualización sobre tu proceso";
       bodyContent = `
-          <p style="color: #475569; font-family: ${fontFamily}; font-size: 14px;">
-            Hola <strong>${candidateName || "candidato/a"}</strong>,
-          </p>
-          <p style="color: #475569; font-family: ${fontFamily}; font-size: 14px;">
-            Agradecemos tu interés en IECS-IEDIS.
-          </p>
-          <p style="color: #475569; font-family: ${fontFamily}; font-size: 14px;">
-            Tras revisar tu perfil, hemos decidido no continuar con tu candidatura en este momento. Sin embargo, conservaremos tus datos en nuestro sistema general para futuras oportunidades que se ajusten a tu perfil.
-          </p>
+          <p>Hola <strong>${candidateName}</strong>,</p>
+          <p>Agradecemos tu interés en IECS-IEDIS.</p>
+          <p>Tras revisar tu perfil, hemos decidido no continuar con tu candidatura en este momento. Sin embargo, conservaremos tus datos en nuestro sistema general para futuras oportunidades que se ajusten a tu perfil.</p>
         `;
       break;
 
-    // INTERNAL STAFF NOTIFICATION FOR NEW APPLICATIONS
-    case "NEW_APPLICATION_STAFF": {
-      const plantelName = data?.plantelName || "";
-      const plantelAddress = data?.plantelAddress || "";
-      const candidateEmail = data?.candidateEmail || "";
-      const candidatePhone = data?.candidatePhone || "";
-      const appliedAt = data?.appliedAt || "";
-      const cvUrl = data?.cvUrl || "";
-      const detailUrl = data?.detailUrl || "#";
-      const jobDepartment = data?.jobDepartment || "";
-      const jobType = data?.jobType || "";
-
-      subject = `Nueva postulación - ${jobTitle || ""}${
-        plantelName ? ` (${plantelName})` : ""
-      }`;
-
-      const plantelBlock =
-        plantelName || plantelAddress
-          ? `
-            <p style="color: #475569; font-family: ${fontFamily}; font-size: 13px; margin: 8px 0 0;">
-              <strong>Plantel:</strong> ${plantelName || "Sin nombre"}<br/>
-              ${plantelAddress ? `<span>${plantelAddress}</span>` : ""}
-            </p>
-          `
-          : "";
-
-      const cvBlock = cvUrl
-        ? `
-            <p style="margin: 16px 0; font-family: ${fontFamily}; font-size: 13px;">
-              <strong>CV del candidato:</strong>
-              <a href="${cvUrl}" style="color: #2563eb; text-decoration: none;"> Ver / Descargar CV</a>
-            </p>
-          `
-        : "";
-
+    // Notificación interna a staff para nuevas aplicaciones / cambios
+    case "NEW_APPLICATION_STAFF":
+      subject = `Nuevo candidato: ${candidateName || "Nuevo registro"} (${jobTitle || "Vacante"})`;
       bodyContent = `
-          <h2 style="color: #0f172a; font-family: ${fontFamily};">Nueva solicitud de empleo</h2>
-          <p style="color: #475569; font-family: ${fontFamily}; font-size: 14px;">
-            Se ha recibido una nueva postulación para la vacante <strong>${jobTitle || ""}</strong>.
-          </p>
-          ${plantelBlock}
-          <ul style="padding-left: 20px; margin: 16px 0; color: #334155; font-family: ${fontFamily}; font-size: 13px;">
-            <li><strong>Candidato:</strong> ${candidateName || "Sin nombre"}</li>
-            <li><strong>Email:</strong> ${candidateEmail || "Sin correo"}</li>
-            <li><strong>Teléfono:</strong> ${candidatePhone || "Sin teléfono"}</li>
+          <h2 style="color: #0f172a; margin-bottom: 8px;">Nuevo movimiento en TalentLink</h2>
+          <p style="margin-bottom: 10px;">Se ha registrado una actividad relevante en el sistema:</p>
+
+          <div style="border-radius: 8px; border: 1px solid #e2e8f0; padding: 16px; margin-bottom: 16px; background: #f8fafc;">
+            <p style="margin: 0 0 6px;"><strong>Candidato:</strong> ${candidateName || "Sin nombre"}</p>
+            ${
+              candidateEmail
+                ? `<p style="margin: 0 0 6px;"><strong>Email:</strong> <a href="mailto:${candidateEmail}" style="color:#2563eb;">${candidateEmail}</a></p>`
+                : ""
+            }
+            ${
+              candidatePhone
+                ? `<p style="margin: 0 0 6px;"><strong>Teléfono:</strong> ${candidatePhone}</p>`
+                : ""
+            }
+          </div>
+
+          <div style="border-radius: 8px; border: 1px solid #e2e8f0; padding: 16px; margin-bottom: 16px; background: #f9fafb;">
+            <p style="margin: 0 0 6px;"><strong>Vacante:</strong> ${jobTitle || "Sin título"}</p>
             ${
               jobDepartment
-                ? `<li><strong>Departamento:</strong> ${jobDepartment}</li>`
+                ? `<p style="margin: 0 0 6px;"><strong>Departamento:</strong> ${jobDepartment}</p>`
                 : ""
             }
             ${
               jobType
-                ? `<li><strong>Tipo de contrato:</strong> ${jobType}</li>`
+                ? `<p style="margin: 0 0 6px;"><strong>Tipo de Contrato:</strong> ${jobType}</p>`
+                : ""
+            }
+            ${
+              plantelName
+                ? `<p style="margin: 0 0 6px;"><strong>Plantel:</strong> ${plantelName}</p>`
+                : ""
+            }
+            ${
+              plantelAddress
+                ? `<p style="margin: 0 0 6px;"><strong>Dirección:</strong> ${plantelAddress}</p>`
                 : ""
             }
             ${
               appliedAt
-                ? `<li><strong>Fecha de postulación:</strong> ${appliedAt}</li>`
+                ? `<p style="margin: 0;"><strong>Fecha de registro:</strong> ${appliedAt}</p>`
                 : ""
             }
-          </ul>
-          ${cvBlock}
-          <p style="margin: 24px 0; text-align: center;">
-            <a href="${detailUrl}" 
-               style="
-                display: inline-block;
-                padding: 12px 24px;
-                background-color: ${primaryColor};
-                color: #ffffff;
-                font-family: ${fontFamily};
-                font-size: 14px;
-                font-weight: 600;
-                text-decoration: none;
-                border-radius: 999px;
-               ">
-              Ver solicitud en TalentLink
-            </a>
-          </p>
-          <p style="color: #94a3b8; font-family: ${fontFamily}; font-size: 11px; margin-top: 8px; text-align: center;">
-            Este correo es informativo y está dirigido al personal interno. No lo reenvíes al candidato.
+          </div>
+
+          <div style="margin-bottom: 18px;">
+            ${
+              detailUrl
+                ? `<a href="${detailUrl}" style="display:inline-block; padding:10px 16px; border-radius:8px; background:#0f172a; color:#ffffff; font-weight:600; font-size:13px; text-decoration:none; margin-right:8px;">Ver candidato en TalentLink</a>`
+                : ""
+            }
+            ${
+              cvUrl
+                ? `<a href="${cvUrl}" style="display:inline-block; padding:10px 16px; border-radius:8px; background:#e5e7eb; color:#111827; font-weight:600; font-size:13px; text-decoration:none;">Ver CV adjunto</a>`
+                : ""
+            }
+          </div>
+
+          <p style="font-size:12px; color:#6b7280; margin-top:4px;">
+            Si no deseas recibir este tipo de correos, actualiza tus preferencias en TalentLink &gt; Configuración &gt; Notificaciones personales.
           </p>
         `;
       break;
-    }
 
     default:
       subject = "Notificación TalentLink";
-      bodyContent = `<p style="color: #475569; font-family: ${fontFamily}; font-size: 14px;">${customMessage || ""}</p>`;
+      bodyContent = `<p>${customMessage || ""}</p>`;
   }
 
   const html = `
       <!DOCTYPE html>
       <html>
       <body style="margin: 0; padding: 0; background-color: #f1f5f9; font-family: ${fontFamily}; color: #334155;">
-        <table width="100%" border="0" cellSpacing="0" cellPadding="0">
+        <table width="100%" border="0" cellspacing="0" cellpadding="0">
           <tr>
             <td align="center" style="padding: 40px 0;">
-              <table width="600" border="0" cellSpacing="0" cellPadding="0" style="background-color: white; border-radius: 12px; overflow: hidden; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);">
+              <table width="600" border="0" cellspacing="0" cellpadding="0" style="background-color: white; border-radius: 12px; overflow: hidden; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);">
                 <tr>
                   <td>
                     ${header}
@@ -210,7 +167,7 @@ export function generateEmailTemplate(type, data) {
                       ${bodyContent}
                     </div>
                     <div style="background-color: #f8fafc; padding: 20px; text-align: center; font-size: 11px; color: #94a3b8;">
-                        © ${new Date().getFullYear()} IECS-IEDIS. Mensaje automático.
+                        © ${new Date().getFullYear()} IECS-IEDIS. Mensaje automático generado por TalentLink.
                     </div>
                   </td>
                 </tr>

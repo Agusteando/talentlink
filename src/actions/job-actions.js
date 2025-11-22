@@ -8,6 +8,10 @@ import { saveFileToDisk, extractResumeData } from "@/lib/file-handler";
 import { sendGmail, createCalendarEvent } from "@/lib/google";
 import { generateEmailTemplate } from "@/lib/email-templates";
 import { PERMISSIONS } from "@/lib/permissions";
+import {
+  DEFAULT_NOTIFICATION_CHANNELS,
+  normalizeNotificationChannels,
+} from "@/lib/notification-preferences";
 import { sendUserPushNotifications } from "@/lib/push";
 
 // helper to check plantel access
@@ -16,45 +20,37 @@ function hasPlantelAccess(session, targetPlantelId) {
   return session.user.plantelIds?.includes(targetPlantelId);
 }
 
-const DEFAULT_PREF = {
-  emailNewEntries: true,
-  emailStatusUpdates: true,
-  inAppNewEntries: true,
-  inAppStatusUpdates: true,
-  pushNewEntries: false,
-  pushStatusUpdates: false,
-};
-
+/**
+ * Elige la preferencia efectiva de notificación para un usuario dado
+ * según la combinación plantelId + jobTitleId, con fallback a reglas más generales.
+ */
 function resolveEffectivePreference(userId, plantelId, jobTitleId, allPrefs) {
   const prefsForUser = allPrefs.filter((p) => p.userId === userId);
 
-  if (prefsForUser.length === 0) return DEFAULT_PREF;
+  if (prefsForUser.length === 0) return DEFAULT_NOTIFICATION_CHANNELS;
 
   const exact =
     prefsForUser.find(
       (p) => p.plantelId === plantelId && p.jobTitleId === jobTitleId
     ) || null;
   const plantelOnly =
-    prefsForUser.find((p) => p.plantelId === plantelId && p.jobTitleId === null) ||
-    null;
+    prefsForUser.find(
+      (p) => p.plantelId === plantelId && p.jobTitleId === null
+    ) || null;
   const jobOnly =
-    prefsForUser.find((p) => p.plantelId === null && p.jobTitleId === jobTitleId) ||
-    null;
+    prefsForUser.find(
+      (p) => p.plantelId === null && p.jobTitleId === jobTitleId
+    ) || null;
   const globalPref =
-    prefsForUser.find((p) => p.plantelId === null && p.jobTitleId === null) || null;
+    prefsForUser.find(
+      (p) => p.plantelId === null && p.jobTitleId === null
+    ) || null;
 
   const chosen = exact || plantelOnly || jobOnly || globalPref;
 
-  if (!chosen) return DEFAULT_PREF;
+  if (!chosen) return DEFAULT_NOTIFICATION_CHANNELS;
 
-  return {
-    emailNewEntries: chosen.emailNewEntries,
-    emailStatusUpdates: chosen.emailStatusUpdates,
-    inAppNewEntries: chosen.inAppNewEntries,
-    inAppStatusUpdates: chosen.inAppStatusUpdates,
-    pushNewEntries: chosen.pushNewEntries,
-    pushStatusUpdates: chosen.pushStatusUpdates,
-  };
+  return normalizeNotificationChannels(chosen);
 }
 
 // ==========================================
@@ -64,7 +60,6 @@ function resolveEffectivePreference(userId, plantelId, jobTitleId, allPrefs) {
 export async function createJob(formData) {
   const session = await auth();
 
-  // 1. Permission Check
   if (!session?.user?.permissions?.includes(PERMISSIONS.MANAGE_JOBS)) {
     return { error: "No tienes permiso para gestionar vacantes." };
   }
@@ -75,17 +70,14 @@ export async function createJob(formData) {
   if (!jobTitleId) return { error: "El Puesto es obligatorio." };
   if (!plantelId) return { error: "El Plantel es obligatorio." };
 
-  // 2. Scope Check (1:N Security)
   if (!hasPlantelAccess(session, plantelId)) {
     return { error: "No tienes acceso a este plantel." };
   }
 
   try {
-    // 3. Validate Puesto
     const jobTitle = await db.jobTitle.findUnique({ where: { id: jobTitleId } });
     if (!jobTitle) return { error: "Puesto inválido." };
 
-    // 4. Create
     await db.job.create({
       data: {
         title: jobTitle.name,
@@ -223,7 +215,7 @@ export async function applyJob(formData) {
       },
     });
 
-    // Candidate confirmation email (72-hour SLA message)
+    // Email de confirmación al candidato
     if (finalEmail) {
       const t = generateEmailTemplate("CONFIRMATION", {
         candidateName: formData.get("fullName"),
@@ -240,7 +232,7 @@ export async function applyJob(formData) {
       });
     }
 
-    // Staff notification email + in-app + push according to preferences
+    // Notificaciones internas a staff (correo, panel y push según preferencias)
     try {
       const baseEnv =
         process.env.NEXT_PUBLIC_BASE_URL ||
@@ -297,7 +289,7 @@ export async function applyJob(formData) {
           allPrefs
         );
 
-        // In-app notification
+        // In-app
         if (pref.inAppNewEntries) {
           notificationOps.push(
             db.notification.create({
@@ -315,7 +307,7 @@ export async function applyJob(formData) {
           );
         }
 
-        // Email to staff
+        // Email staff
         if (pref.emailNewEntries && user.email) {
           const staffTemplate = generateEmailTemplate("NEW_APPLICATION_STAFF", {
             candidateName: app.fullName,
@@ -340,7 +332,7 @@ export async function applyJob(formData) {
           );
         }
 
-        // Push notifications
+        // Push
         if (pref.pushNewEntries) {
           sendUserPushNotifications(user.id, {
             title: "Nueva postulación",
@@ -477,7 +469,7 @@ export async function updateApplicationStatus(
       });
     }
 
-    // 3. Candidate Email Notification (optional, already controlled externally)
+    // 3. Email al candidato (opcional)
     if (shouldSendEmail) {
       const emailTarget = currentApp.email || currentApp.user?.email;
       const targetStatus = nextStatus;
@@ -501,7 +493,7 @@ export async function updateApplicationStatus(
       }
     }
 
-    // 4. Staff notifications for STATUS_UPDATE
+    // 4. Staff notifications para STATUS_UPDATE
     if (isStatusChange) {
       try {
         const baseEnv =
@@ -556,7 +548,7 @@ export async function updateApplicationStatus(
             allPrefs
           );
 
-          // In-app notification
+          // In-app
           if (pref.inAppStatusUpdates) {
             notificationOps.push(
               db.notification.create({
@@ -574,22 +566,24 @@ export async function updateApplicationStatus(
             );
           }
 
-          // Email channel
+          // Email
           if (pref.emailStatusUpdates && user.email) {
-            const staffTemplate = generateEmailTemplate("NEW_APPLICATION_STAFF", {
-              // Reuse layout but text is about status change; subject is overridden below
-              candidateName: updatedApp.fullName,
-              candidateEmail: updatedApp.email || "",
-              candidatePhone: updatedApp.phone || "",
-              jobTitle: currentApp.job.title,
-              jobDepartment: currentApp.job.department || "",
-              jobType: currentApp.job.type || "",
-              plantelName: currentApp.job.plantel?.name || "",
-              plantelAddress: currentApp.job.plantel?.address || "",
-              appliedAt: updatedApp.updatedAt.toLocaleString("es-MX"),
-              cvUrl: updatedApp.cvUrl || "",
-              detailUrl,
-            });
+            const staffTemplate = generateEmailTemplate(
+              "NEW_APPLICATION_STAFF",
+              {
+                candidateName: updatedApp.fullName,
+                candidateEmail: updatedApp.email || "",
+                candidatePhone: updatedApp.phone || "",
+                jobTitle: currentApp.job.title,
+                jobDepartment: currentApp.job.department || "",
+                jobType: currentApp.job.type || "",
+                plantelName: currentApp.job.plantel?.name || "",
+                plantelAddress: currentApp.job.plantel?.address || "",
+                appliedAt: updatedApp.updatedAt.toLocaleString("es-MX"),
+                cvUrl: updatedApp.cvUrl || "",
+                detailUrl,
+              }
+            );
 
             emailPromises.push(
               sendGmail({
@@ -600,7 +594,7 @@ export async function updateApplicationStatus(
             );
           }
 
-          // Push notifications
+          // Push
           if (pref.pushStatusUpdates) {
             sendUserPushNotifications(user.id, {
               title: "Cambio de estado",
