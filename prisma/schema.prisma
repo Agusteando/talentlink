@@ -1,4 +1,4 @@
-// --- prisma\schema.prisma ---
+
 generator client {
   provider = "prisma-client-js"
 }
@@ -12,35 +12,36 @@ datasource db {
 
 model Plantel {
   id          String   @id @default(cuid())
-  name        String   
-  code        String   @unique 
+  name        String
+  code        String   @unique
   address     String   @db.Text
   lat         Float?
   lng         Float?
   isActive    Boolean  @default(true)
-  
+
   jobs        Job[]
-  
+
   // REVISED: Many-to-Many relation with Users
-  users       User[]   
-  
+  users       User[]
+
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 }
 
 model JobTitle {
   id        String   @id @default(cuid())
-  name      String   @unique 
-  category  String?  
+  name      String   @unique
+  category  String?
   isActive  Boolean  @default(true)
   jobs      Job[]
 }
 
 model ChecklistTemplate {
   id        String   @id @default(cuid())
-  name      String   
-  type      String   @default("TEXT") 
+  name      String
+  type      String   @default("TEXT")
   isActive  Boolean  @default(true)
+  sortOrder Int      @default(0)
   createdAt DateTime @default(now())
 }
 
@@ -48,9 +49,9 @@ model ChecklistTemplate {
 
 model Role {
   id          String   @id @default(cuid())
-  name        String   @unique 
-  isGlobal    Boolean  @default(false) 
-  permissions String   @db.Text 
+  name        String   @unique
+  isGlobal    Boolean  @default(false)
+  permissions String   @db.Text
   users       User[]
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -62,83 +63,85 @@ model User {
   email           String?   @unique
   emailVerified   DateTime?
   image           String?
-  
+
   roleId          String?
   role            Role?     @relation(fields: [roleId], references: [id], map: "fk_user_role")
-  
+
   // REVISED: Many-to-Many. No longer a single string ID.
   plantels        Plantel[]
-  
+
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
   applications    Application[]
-  comments        Comment[] 
+  comments        Comment[]
 }
 
 // --- BUSINESS ---
 
 model Job {
   id          String   @id @default(cuid())
-  title       String   
+  title       String
   jobTitleId  String?
   jobTitle    JobTitle? @relation(fields: [jobTitleId], references: [id], map: "fk_job_title")
   description String   @db.Text
   department  String
   type        String   @default("Tiempo Completo")
-  status      String   @default("OPEN") 
+  status      String   @default("OPEN")
   closingDate DateTime?
   plantelId   String
-  plantel     Plantel @relation(fields: [plantelId], references: [id], map: "fk_job_plantel")
+  plantel     Plantel  @relation(fields: [plantelId], references: [id], map: "fk_job_plantel")
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   applications Application[]
 }
 
 model Application {
-  id          String   @id @default(cuid())
-  userId      String?
-  user        User?    @relation(fields: [userId], references: [id], onDelete: SetNull, map: "fk_app_user")
-  jobId       String
-  job         Job      @relation(fields: [jobId], references: [id], onDelete: Cascade, map: "fk_app_job")
-  
-  fullName    String
-  phone       String?
-  email       String   
-  cvUrl       String?  
-  cvText      String?  @db.LongText
-  
-  status      String   @default("NEW") 
-  interviewStage Int   @default(0)     
-  isFavorite  Boolean  @default(false)
-  interviewDate DateTime? 
+  id             String    @id @default(cuid())
+  userId         String?
+  user           User?     @relation(fields: [userId], references: [id], onDelete: SetNull, map: "fk_app_user")
+  jobId          String
+  job            Job       @relation(fields: [jobId], references: [id], onDelete: Cascade, map: "fk_app_job")
+
+  fullName       String
+  phone          String?
+  email          String
+  cvUrl          String?
+  cvText         String?   @db.LongText
+
+  status         String    @default("NEW")
+  interviewStage Int       @default(0)
+  isFavorite     Boolean   @default(false)
+  interviewDate  DateTime?
 
   checklistValues ChecklistValue[]
 
-  comments    Comment[]
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt 
-  
+  comments       Comment[]
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
   @@index([userId])
   @@index([jobId])
 }
 
 model ChecklistValue {
-  id          String   @id @default(cuid())
+  id            String       @id @default(cuid())
   applicationId String
-  application   Application @relation(fields: [applicationId], references: [id], onDelete: Cascade, map: "fk_checklist_app")
-  templateId    String   
-  value         String?  @db.Text 
-  updatedAt     DateTime @updatedAt
+  application   Application  @relation(fields: [applicationId], references: [id], onDelete: Cascade, map: "fk_checklist_app")
+  templateId    String
+  value         String?      @db.Text
+  updatedAt     DateTime     @updatedAt
+
   @@unique([applicationId, templateId])
 }
 
 model Comment {
-  id            String   @id @default(cuid())
-  text          String   @db.Text
-  createdAt     DateTime @default(now())
+  id            String      @id @default(cuid())
+  text          String      @db.Text
+  createdAt     DateTime    @default(now())
   userId        String
-  user          User     @relation(fields: [userId], references: [id], map: "fk_comment_user")
+  user          User        @relation(fields: [userId], references: [id], map: "fk_comment_user")
   applicationId String
   application   Application @relation(fields: [applicationId], references: [id], onDelete: Cascade, map: "fk_comment_app")
+
   @@index([applicationId])
 }
