@@ -342,9 +342,9 @@ export default function NotificationSettingsPanel({
         </button>
       </div>
 
-      {/* Advanced grid (optional) */}
+      {/* Advanced cards (simplified, more visual) */}
       {showAdvanced && (
-        <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+        <div className="rounded-2xl border border-slate-200 bg-white shadow-sm">
           <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50 px-4 py-3">
             <div className="flex items-center gap-2">
               <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-50 text-blue-600">
@@ -355,7 +355,7 @@ export default function NotificationSettingsPanel({
                   Reglas avanzadas
                 </p>
                 <p className="text-xs text-slate-400">
-                  Ajusta canales de notificación por plantel y/o puesto. La
+                  Ajusta los canales de notificación por plantel y/o puesto. La
                   coincidencia más específica tiene prioridad.
                 </p>
               </div>
@@ -369,66 +369,39 @@ export default function NotificationSettingsPanel({
             </button>
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full text-xs">
-              <thead className="bg-slate-50 text-slate-500 uppercase tracking-wide">
-                <tr>
-                  <th className="px-3 py-2 text-left">Plantel</th>
-                  <th className="px-3 py-2 text-left">Puesto</th>
-                  <th className="px-3 py-2 text-center">
-                    <div className="flex flex-col items-center gap-0.5">
-                      <Mail size={12} /> Nuevas
-                    </div>
-                  </th>
-                  <th className="px-3 py-2 text-center">
-                    <div className="flex flex-col items-center gap-0.5">
-                      <Mail size={12} /> Estatus
-                    </div>
-                  </th>
-                  <th className="px-3 py-2 text-center">
-                    <div className="flex flex-col items-center gap-0.5">
-                      <Monitor size={12} /> Nuevas
-                    </div>
-                  </th>
-                  <th className="px-3 py-2 text-center">
-                    <div className="flex flex-col items-center gap-0.5">
-                      <Monitor size={12} /> Estatus
-                    </div>
-                  </th>
-                  <th className="px-3 py-2 text-center">
-                    <div className="flex flex-col items-center gap-0.5">
-                      <Wifi size={12} /> Nuevas
-                    </div>
-                  </th>
-                  <th className="px-3 py-2 text-center">
-                    <div className="flex flex-col items-center gap-0.5">
-                      <Wifi size={12} /> Estatus
-                    </div>
-                  </th>
-                  <th className="px-3 py-2 text-right"></th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {rows.length === 0 && (
-                  <tr>
-                    <td
-                      colSpan="9"
-                      className="px-4 py-6 text-center text-slate-400"
-                    >
-                      Aún no tienes reglas configuradas. Agrega al menos una
-                      regla global o por plantel.
-                    </td>
-                  </tr>
-                )}
-                {rows.map((row, index) => (
-                  <tr key={index} className="hover:bg-slate-50/40">
-                    <td className="px-3 py-2 min-w-[160px]">
+          <div className="divide-y divide-slate-100">
+            {rows.length === 0 && (
+              <div className="px-4 py-6 text-center text-xs text-slate-400">
+                Aún no tienes reglas avanzadas. Agrega una para un plantel o
+                puesto específico.
+              </div>
+            )}
+
+            {rows.map((row, index) => {
+              const plantelLabel =
+                row.plantelId &&
+                plantels.find((p) => p.id === row.plantelId)?.name;
+              const jobLabel =
+                row.jobTitleId &&
+                jobTitles.find((t) => t.id === row.jobTitleId)?.name;
+
+              return (
+                <div
+                  key={index}
+                  className="px-4 py-4 flex flex-col gap-4 md:flex-row md:items-start md:justify-between"
+                >
+                  {/* Scope selectors */}
+                  <div className="flex-1 flex flex-col gap-3">
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-500 mb-1">
+                        Plantel
+                      </label>
                       <select
                         value={row.plantelId}
                         onChange={(e) =>
                           updateRow(index, { plantelId: e.target.value })
                         }
-                        className="w-full rounded border border-slate-200 bg-white px-2 py-1 text-xs"
+                        className="w-full rounded border border-slate-200 bg-white px-2 py-1.5 text-xs"
                       >
                         <option value="">Todos los planteles</option>
                         {plantels.map((p) => (
@@ -437,14 +410,17 @@ export default function NotificationSettingsPanel({
                           </option>
                         ))}
                       </select>
-                    </td>
-                    <td className="px-3 py-2 min-w-[180px]">
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-500 mb-1">
+                        Puesto
+                      </label>
                       <select
                         value={row.jobTitleId}
                         onChange={(e) =>
                           updateRow(index, { jobTitleId: e.target.value })
                         }
-                        className="w-full rounded border border-slate-200 bg-white px-2 py-1 text-xs"
+                        className="w-full rounded border border-slate-200 bg-white px-2 py-1.5 text-xs"
                       >
                         <option value="">Todos los puestos</option>
                         {jobTitles.map((t) => (
@@ -453,89 +429,144 @@ export default function NotificationSettingsPanel({
                           </option>
                         ))}
                       </select>
-                    </td>
+                    </div>
+                    <p className="text-[11px] text-slate-400">
+                      {plantelLabel || "Todos los planteles"} •{" "}
+                      {jobLabel || "Todos los puestos"}
+                    </p>
+                  </div>
 
-                    {/* Email new */}
-                    <td className="px-3 py-2 text-center">
-                      <TogglePill
-                        active={row.emailNewEntries}
-                        onClick={() =>
-                          updateRow(index, {
-                            emailNewEntries: !row.emailNewEntries,
-                          })
-                        }
-                      />
-                    </td>
-                    {/* Email status */}
-                    <td className="px-3 py-2 text-center">
-                      <TogglePill
-                        active={row.emailStatusUpdates}
-                        onClick={() =>
-                          updateRow(index, {
-                            emailStatusUpdates: !row.emailStatusUpdates,
-                          })
-                        }
-                      />
-                    </td>
-                    {/* In-app new */}
-                    <td className="px-3 py-2 text-center">
-                      <TogglePill
-                        active={row.inAppNewEntries}
-                        onClick={() =>
-                          updateRow(index, {
-                            inAppNewEntries: !row.inAppNewEntries,
-                          })
-                        }
-                      />
-                    </td>
-                    {/* In-app status */}
-                    <td className="px-3 py-2 text-center">
-                      <TogglePill
-                        active={row.inAppStatusUpdates}
-                        onClick={() =>
-                          updateRow(index, {
-                            inAppStatusUpdates: !row.inAppStatusUpdates,
-                          })
-                        }
-                      />
-                    </td>
-                    {/* Push new */}
-                    <td className="px-3 py-2 text-center">
-                      <TogglePill
-                        active={row.pushNewEntries}
-                        onClick={() =>
-                          updateRow(index, {
-                            pushNewEntries: !row.pushNewEntries,
-                          })
-                        }
-                      />
-                    </td>
-                    {/* Push status */}
-                    <td className="px-3 py-2 text-center">
-                      <TogglePill
-                        active={row.pushStatusUpdates}
-                        onClick={() =>
-                          updateRow(index, {
-                            pushStatusUpdates: !row.pushStatusUpdates,
-                          })
-                        }
-                      />
-                    </td>
+                  {/* Channel groups */}
+                  <div className="flex-1 grid grid-cols-1 gap-3 sm:grid-cols-3">
+                    {/* Email */}
+                    <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                      <div className="flex items-center gap-1 mb-2">
+                        <Mail size={11} className="text-slate-500" />
+                        <span className="text-[11px] font-bold text-slate-700">
+                          Correo
+                        </span>
+                      </div>
+                      <div className="space-y-1.5">
+                        <div className="flex items-center gap-2">
+                          <TogglePill
+                            active={row.emailNewEntries}
+                            onClick={() =>
+                              updateRow(index, {
+                                emailNewEntries: !row.emailNewEntries,
+                              })
+                            }
+                          />
+                          <span className="text-[11px] text-slate-500">
+                            Nuevas postulaciones
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <TogglePill
+                            active={row.emailStatusUpdates}
+                            onClick={() =>
+                              updateRow(index, {
+                                emailStatusUpdates: !row.emailStatusUpdates,
+                              })
+                            }
+                          />
+                          <span className="text-[11px] text-slate-500">
+                            Cambios de estado
+                          </span>
+                        </div>
+                      </div>
+                    </div>
 
-                    <td className="px-3 py-2 text-right">
-                      <button
-                        type="button"
-                        onClick={() => removeRow(index)}
-                        className="inline-flex items-center justify-center rounded-full p-1.5 text-slate-300 hover:text-red-600 hover:bg-red-50 transition"
-                        title="Eliminar regla"
-                      >
-                        <Trash2 size={14} />
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                    {/* In-app */}
+                    <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                      <div className="flex items-center gap-1 mb-2">
+                        <Monitor size={11} className="text-slate-500" />
+                        <span className="text-[11px] font-bold text-slate-700">
+                          Panel (campana)
+                        </span>
+                      </div>
+                      <div className="space-y-1.5">
+                        <div className="flex items-center gap-2">
+                          <TogglePill
+                            active={row.inAppNewEntries}
+                            onClick={() =>
+                              updateRow(index, {
+                                inAppNewEntries: !row.inAppNewEntries,
+                              })
+                            }
+                          />
+                          <span className="text-[11px] text-slate-500">
+                            Nuevas postulaciones
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <TogglePill
+                            active={row.inAppStatusUpdates}
+                            onClick={() =>
+                              updateRow(index, {
+                                inAppStatusUpdates: !row.inAppStatusUpdates,
+                              })
+                            }
+                          />
+                          <span className="text-[11px] text-slate-500">
+                            Cambios de estado
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Push */}
+                    <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                      <div className="flex items-center gap-1 mb-2">
+                        <Wifi size={11} className="text-slate-500" />
+                        <span className="text-[11px] font-bold text-slate-700">
+                          Push navegador
+                        </span>
+                      </div>
+                      <div className="space-y-1.5">
+                        <div className="flex items-center gap-2">
+                          <TogglePill
+                            active={row.pushNewEntries}
+                            onClick={() =>
+                              updateRow(index, {
+                                pushNewEntries: !row.pushNewEntries,
+                              })
+                            }
+                          />
+                          <span className="text-[11px] text-slate-500">
+                            Nuevas postulaciones
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <TogglePill
+                            active={row.pushStatusUpdates}
+                            onClick={() =>
+                              updateRow(index, {
+                                pushStatusUpdates: !row.pushStatusUpdates,
+                              })
+                            }
+                          />
+                          <span className="text-[11px] text-slate-500">
+                            Cambios de estado
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Delete button */}
+                  <div className="flex items-start justify-end md:w-20">
+                    <button
+                      type="button"
+                      onClick={() => removeRow(index)}
+                      className="inline-flex items-center justify-center rounded-full p-1.5 text-slate-300 hover:text-red-600 hover:bg-red-50 transition"
+                      title="Eliminar regla"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
