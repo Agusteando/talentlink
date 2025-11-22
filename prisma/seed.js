@@ -1,15 +1,14 @@
-// --- prisma/seed.js ---
+// prisma/seed.js
 const { PrismaClient } = require('@prisma/client');
+const { randomUUID } = require('crypto');
+const fs = require('fs');
+const path = require('path');
+
 const prisma = new PrismaClient();
 
 /**
- * Naming Convention:
- * "<Institution> Campus <City> – <Nivel>"
- *
- * Casita del Saber = Preescolar + General Campus labels
- * IEDIS = Primaria, Secundaria, Desarrollo Infantil
+ * PLANTELES
  */
-
 const planteles = [
   //
   // TOLUCA — Casita (pre) + IEDIS (pri/sec)
@@ -116,29 +115,73 @@ const planteles = [
   },
 ];
 
-async function main() {
-  console.log('-----------------------------------------------------------');
-  console.log('🌱 STARTING SEED PROCESS');
-  console.log('DATABASE_URL:', process.env.DATABASE_URL);
-  console.log('-----------------------------------------------------------');
+/**
+ * CHECKLIST ITEMS
+ * Table: checklisttemplate
+ */
+const checklistItems = [
+  { id: 'chk-entrevista-1', name: 'Entrevista 1', type: 'DATE', sortOrder: 1 },
+  { id: 'chk-entrevista-2', name: 'Entrevista 2', type: 'DATE', sortOrder: 2 },
+  {
+    id: 'chk-documentos-signia',
+    name: 'Documentos Signia',
+    type: 'CHECKBOX',
+    sortOrder: 3,
+  },
+  { id: 'chk-evaluatest', name: 'Evaluatest', type: 'CHECKBOX', sortOrder: 4 },
+  { id: 'chk-path', name: 'PATH', type: 'CHECKBOX', sortOrder: 5 },
+];
 
-  // Check DB connectivity
-  try {
-    await prisma.$queryRaw`SELECT 1`;
-    console.log('✅ Database connection OK\n');
-  } catch (e) {
-    console.error('❌ Database connection failed:', e);
-    process.exit(1);
+/**
+ * Load puestos from prisma/puestos.csv
+ * CSV format:
+ *   name
+ *   ADMON ESCOLAR
+ *   ...
+ */
+function loadPuestosFromCsv() {
+  const csvPath = path.join(__dirname, 'puestos.csv'); // <— place file here
+  const raw = fs.readFileSync(csvPath, 'utf8');
+
+  const lines = raw
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .filter((l) => l.length > 0);
+
+  if (lines.length === 0) return [];
+
+  const header = lines[0].split(',').map((h) => h.trim());
+  const nameIdx = header.indexOf('name');
+  const categoryIdx = header.indexOf('category'); // optional
+
+  if (nameIdx === -1) {
+    throw new Error('puestos.csv must have a "name" column');
   }
 
-  const before = await prisma.plantel.count();
-  console.log('Planteles BEFORE seeding:', before);
-  console.log('-----------------------------------------------------------\n');
+  const puestos = lines.slice(1).map((line) => {
+    const cols = line.split(',');
+    const name = (cols[nameIdx] || '').trim();
+    const category =
+      categoryIdx >= 0 && cols[categoryIdx]
+        ? cols[categoryIdx].trim()
+        : null;
 
-  // Insert/update all planteles
+    if (!name) return null;
+
+    return { name, category };
+  });
+
+  return puestos.filter(Boolean);
+}
+
+/**
+ * SEED HELPERS
+ */
+
+async function seedPlanteles() {
+  console.log('→ Seeding planteles…');
+
   for (const p of planteles) {
-    console.log(`➡️  Upserting: [${p.code}] ${p.name}`);
-
     await prisma.plantel.upsert({
       where: { code: p.code },
       update: {
@@ -159,10 +202,82 @@ async function main() {
     });
   }
 
-  console.log('\n-----------------------------------------------------------');
-  const after = await prisma.plantel.count();
-  console.log('Planteles AFTER seeding:', after);
-  console.log('🌱 Seed completed successfully!');
+  const count = await prisma.plantel.count();
+  console.log(`   ✅ planteles count: ${count}`);
+}
+
+async function seedJobTitles() {
+  console.log('→ Seeding job titles (puestos)…');
+
+  const puestos = loadPuestosFromCsv();
+  console.log(`   Found ${puestos.length} puestos in CSV`);
+
+  for (const p of puestos) {
+    await prisma.jobtitle.upsert({
+      // name is UNIQUE in your table, so we use it as the identity
+      where: { name: p.name },
+      update: {
+        category: p.category || null,
+        isActive: true,
+      },
+      create: {
+        id: randomUUID(),
+        name: p.name,
+        category: p.category || null,
+        isActive: true,
+      },
+    });
+  }
+
+  const count = await prisma.jobtitle.count();
+  console.log(`   ✅ jobtitle count: ${count}`);
+}
+
+async function seedChecklistTemplates() {
+  console.log('→ Seeding checklist templates…');
+
+  for (const c of checklistItems) {
+    await prisma.checklisttemplate.upsert({
+      where: { id: c.id }, // primary key
+      update: {
+        name: c.name,
+        type: c.type,
+        isActive: true,
+        sortOrder: c.sortOrder,
+      },
+      create: {
+        id: c.id,
+        name: c.name,
+        type: c.type,
+        isActive: true,
+        sortOrder: c.sortOrder,
+      },
+    });
+  }
+
+  const count = await prisma.checklisttemplate.count();
+  console.log(`   ✅ checklisttemplate count: ${count}`);
+}
+
+/**
+ * MAIN
+ */
+
+async function main() {
+  console.log('-----------------------------------------------------------');
+  console.log('🌱 STARTING SEED PROCESS');
+  console.log('DATABASE_URL:', process.env.DATABASE_URL);
+  console.log('-----------------------------------------------------------');
+
+  // Connectivity check
+  await prisma.$queryRaw`SELECT 1`;
+  console.log('✅ Database connection OK\n');
+
+  await seedPlanteles();
+  await seedJobTitles();
+  await seedChecklistTemplates();
+
+  console.log('\n🌱 Seed completed successfully!');
   console.log('-----------------------------------------------------------');
 }
 

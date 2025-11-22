@@ -116,7 +116,9 @@ export default function ChecklistList({ items, typeLabels }) {
         const isDragging = draggingId === item.id;
         const isBusy = actionId === item.id && isPending;
         const typeLabel =
-          typeLabels?.[item.type] || typeLabels?.[item.type?.toUpperCase()] || item.type;
+          typeLabels?.[item.type] ||
+          typeLabels?.[item.type?.toUpperCase()] ||
+          item.type;
 
         return (
           <div
@@ -161,9 +163,6 @@ export default function ChecklistList({ items, typeLabels }) {
                 <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-500">
                   <span className="rounded bg-slate-100 px-2 py-0.5 font-medium">
                     {typeLabel}
-                  </span>
-                  <span className="text-[10px] text-slate-400">
-                    ID: {item.id.slice(0, 8)}...
                   </span>
                 </div>
               </div>

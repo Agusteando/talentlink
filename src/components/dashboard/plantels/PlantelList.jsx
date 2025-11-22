@@ -1,4 +1,4 @@
-// --- src\components\dashboard\plantels\PlantelList.jsx ---
+
 'use client';
 
 import { useState } from 'react';
@@ -83,7 +83,6 @@ export default function PlantelList({ initialData }) {
                                 </div>
                                 <div>
                                     <div className="font-bold text-slate-800">{p.name}</div>
-                                    <div className="text-xs text-slate-400 font-mono">ID: {p.id.substring(0,8)}...</div>
                                 </div>
                             </div>
                         </td>
