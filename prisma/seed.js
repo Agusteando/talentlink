@@ -9,9 +9,12 @@ const prisma = new PrismaClient();
 /**
  * PLANTELES
  */
+/**
+ * PLANTELES
+ */
 const planteles = [
   //
-  // TOLUCA — Casita (pre) + IEDIS (pri/sec)
+  // TOLUCA — Casita (pre/guardería) + IEDIS (pri/sec)
   //
   {
     code: 'PREET',
@@ -25,21 +28,21 @@ const planteles = [
     code: 'PT',
     name: 'IEDIS Campus Toluca – Primaria',
     address:
-      'Calle España 8, Col. Las Verdolagas, San Mateo Oxtotitlán, 50100 Toluca, Estado de México',
-    lat: 19.293653,
-    lng: -99.69226,
+      'Niños Héroes 12C, Rancho San Jorge, 50100 Toluca, Estado de México',
+    lat: 19.29625278469902,
+    lng: -99.69547904232788,
   },
   {
     code: 'ST',
     name: 'IEDIS Campus Toluca – Secundaria',
     address:
-      'Calle España 8, Col. Las Verdolagas, San Mateo Oxtotitlán, 50100 Toluca, Estado de México',
-    lat: 19.293653,
-    lng: -99.69226,
+      'Niños Héroes 12C, Rancho San Jorge, 50100 Toluca, Estado de México',
+    lat: 19.29625278469902,
+    lng: -99.69547904232788,
   },
   {
     code: 'CT',
-    name: 'Casita del Saber Campus Toluca',
+    name: 'Guardería Casita del Saber Campus Toluca',
     address:
       'Calle España 8, Col. Las Verdolagas, San Mateo Oxtotitlán, 50100 Toluca, Estado de México',
     lat: 19.293653,
@@ -47,7 +50,7 @@ const planteles = [
   },
 
   //
-  // METEPEC — Casita (pre) + IEDIS (pri/sec/desarrollo)
+  // METEPEC — Casita (pre/guardería) + IEDIS (pri/sec/guardería)
   //
   {
     code: 'PREEM',
@@ -61,21 +64,21 @@ const planteles = [
     code: 'PM',
     name: 'IEDIS Campus Metepec – Primaria',
     address:
-      'Av. 5 532, Col. San José La Pilita, 52149 Metepec, Estado de México',
-    lat: 19.25877,
-    lng: -99.58566,
+      'Av. Jaguey, Mariano Matamoros 1201, San Mateo, Metepec, Estado de México',
+    lat: 19.25680666440971,
+    lng: -99.5923355846725,
   },
   {
     code: 'SM',
     name: 'IEDIS Campus Metepec – Secundaria',
     address:
-      'Av. 5 532, Col. San José La Pilita, 52149 Metepec, Estado de México',
-    lat: 19.25877,
-    lng: -99.58566,
+      'Av. Jaguey, Mariano Matamoros 1201, San Mateo, Metepec, Estado de México',
+    lat: 19.25680666440971,
+    lng: -99.5923355846725,
   },
   {
     code: 'CM',
-    name: 'Casita del Saber Campus Metepec',
+    name: 'Guardería Casita del Saber Campus Metepec',
     address:
       'Av. 5 532, Col. San José La Pilita, 52149 Metepec, Estado de México',
     lat: 19.25877,
@@ -83,7 +86,7 @@ const planteles = [
   },
   {
     code: 'DM',
-    name: 'IEDIS Campus Metepec – Desarrollo Infantil',
+    name: 'Guardería IEDIS Campus Metepec',
     address:
       'Av. 5 532-3, Col. San José La Pilita, 52149 Metepec, Estado de México',
     lat: 19.25877,
@@ -91,11 +94,11 @@ const planteles = [
   },
 
   //
-  // OCOYOACAC — Casita
+  // OCOYOACAC — Guardería Casita
   //
   {
     code: 'CO',
-    name: 'Casita del Saber Campus Ocoyoacac',
+    name: 'Guardería Casita del Saber Campus Ocoyoacac',
     address:
       'Av. Martín Chimaltecalt 122, Barrio de Santa María, 52740 Ocoyoacac, Estado de México',
     lat: 19.2705874,
@@ -103,17 +106,18 @@ const planteles = [
   },
 
   //
-  // CALIMAYA — IEDIS Desarrollo
+  // CALIMAYA — Guardería IEDIS
   //
   {
     code: 'DC',
-    name: 'IEDIS Campus Calimaya – Desarrollo Infantil',
+    name: 'Guardería IEDIS Campus Calimaya',
     address:
       'Calle La Gardenia 45, San Andrés Ocotlán, 52220 Calimaya, Estado de México',
     lat: 19.1925777,
     lng: -99.5857616,
   },
 ];
+
 
 /**
  * CHECKLIST ITEMS

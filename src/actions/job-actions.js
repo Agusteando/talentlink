@@ -87,6 +87,7 @@ export async function createJob(formData) {
         department: formData.get("department"),
         status: formData.get("status") || "OPEN",
         type: formData.get("type") || "Tiempo Completo",
+        salaryRange: formData.get("salaryRange") || null,
         closingDate: formData.get("closingDate")
           ? new Date(formData.get("closingDate"))
           : null,
@@ -129,6 +130,7 @@ export async function updateJob(formData) {
         department: formData.get("department"),
         status: formData.get("status"),
         type: formData.get("type"),
+        salaryRange: formData.get("salaryRange") || null,
         closingDate: formData.get("closingDate")
           ? new Date(formData.get("closingDate"))
           : null,

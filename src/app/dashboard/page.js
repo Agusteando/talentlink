@@ -1,5 +1,4 @@
 
-// --- src\app\dashboard\page.js ---
 import { db } from "@/lib/db";
 import { auth } from "@/auth";
 import Link from "next/link";
@@ -34,6 +33,11 @@ export default async function Dashboard({ searchParams }) {
   const session = await auth();
   // BLOCK CANDIDATES entirely if they somehow slipped through
   if (!session || session.user.role === "CANDIDATE") redirect("/");
+
+  const plantelIds = session.user.plantelIds || [];
+  if (!session.user.isGlobal && plantelIds.length === 0) {
+    redirect("/dashboard/onboarding");
+  }
 
   const query = searchParams?.query || "";
   const showFavorites = searchParams?.filter === "favorites";

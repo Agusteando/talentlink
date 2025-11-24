@@ -1,3 +1,4 @@
+
 generator client {
   provider = "prisma-client-js"
 }
@@ -99,6 +100,7 @@ model Job {
   description String    @db.Text
   department  String
   type        String    @default("Tiempo Completo")
+  salaryRange String?
   status      String    @default("OPEN")
   closingDate DateTime?
   plantelId   String

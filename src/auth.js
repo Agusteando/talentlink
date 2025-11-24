@@ -6,6 +6,7 @@ import { authConfig } from "@/auth.config";
 import { PERMISSIONS } from "@/lib/permissions";
 
 const ALLOWED_DOMAIN = "casitaiedis.edu.mx";
+const DEFAULT_STAFF_ROLE_NAME = "Staff Básico";
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
   ...authConfig,
@@ -29,33 +30,40 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
 
       // 1) Corporate wall: only casitaiedis.edu.mx or the explicit bootstrap admin can pass
       if (!isAllowedDomain && !isBootstrapAdmin) {
-        console.error("🚫 BLOCKING LOGIN: Email not in allowed domain and not bootstrap admin", {
-          email,
-          domain,
-          allowedDomain: ALLOWED_DOMAIN,
-          defaultAdminEmail,
-        });
+        console.error(
+          "🚫 BLOCKING LOGIN: Email not in allowed domain and not bootstrap admin",
+          {
+            email,
+            domain,
+            allowedDomain: ALLOWED_DOMAIN,
+            defaultAdminEmail,
+          }
+        );
         return false;
       }
 
       // 2) Best-effort registration / bootstrap in DB
       try {
         let superAdminRole = null;
+        let basicStaffRole = null;
+
+        const allPermissionValues = Object.values(PERMISSIONS);
+        const basicPermissionValues = [PERMISSIONS.VIEW_DASHBOARD];
 
         // Ensure Super Admin role exists ONLY for the bootstrap admin
         if (isBootstrapAdmin) {
-          const allPerms = JSON.stringify(Object.values(PERMISSIONS));
+          const allPermsJson = JSON.stringify(allPermissionValues);
 
           superAdminRole = await db.role.upsert({
             where: { name: "Super Admin" },
             update: {
               isGlobal: true,
-              permissions: allPerms,
+              permissions: allPermsJson,
             },
             create: {
               name: "Super Admin",
               isGlobal: true,
-              permissions: allPerms,
+              permissions: allPermsJson,
             },
           });
 
@@ -64,16 +72,40 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           });
         }
 
+        // Ensure default basic staff role exists for regular users
+        const basicPermsJson = JSON.stringify(basicPermissionValues);
+        basicStaffRole = await db.role.upsert({
+          where: { name: DEFAULT_STAFF_ROLE_NAME },
+          update: {
+            isGlobal: false,
+            permissions: basicPermsJson,
+          },
+          create: {
+            name: DEFAULT_STAFF_ROLE_NAME,
+            isGlobal: false,
+            permissions: basicPermsJson,
+          },
+        });
+
+        console.log("[Auth] Basic staff role ensured", {
+          roleId: basicStaffRole.id,
+          permissions: basicPermissionValues,
+        });
+
         const existingUser = await db.user.findUnique({
           where: { email },
         });
 
         if (!existingUser) {
           // Any @casitaiedis.edu.mx user is registered here on first login
+          const assignedRoleId = isBootstrapAdmin
+            ? superAdminRole?.id || null
+            : basicStaffRole.id;
+
           console.log("[Auth] Creating new user record", {
             email,
             isBootstrapAdmin,
-            assignRoleId: superAdminRole?.id || null,
+            assignRoleId: assignedRoleId,
           });
 
           await db.user.create({
@@ -81,24 +113,24 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
               email,
               name: user.name,
               image: user.image,
-              // Only the DEFAULT_ADMIN_EMAIL gets Super Admin automatically
-              roleId: isBootstrapAdmin ? superAdminRole?.id || null : null,
+              // DEFAULT_ADMIN_EMAIL -> Super Admin, otherwise Staff Básico
+              roleId: assignedRoleId,
             },
           });
         } else if (isBootstrapAdmin && !existingUser.roleId) {
           // Safety net: if bootstrap admin exists but has no role, assign Super Admin
           if (!superAdminRole) {
-            const allPerms = JSON.stringify(Object.values(PERMISSIONS));
+            const allPermsJson = JSON.stringify(allPermissionValues);
             superAdminRole = await db.role.upsert({
               where: { name: "Super Admin" },
               update: {
                 isGlobal: true,
-                permissions: allPerms,
+                permissions: allPermsJson,
               },
               create: {
                 name: "Super Admin",
                 isGlobal: true,
-                permissions: allPerms,
+                permissions: allPermsJson,
               },
             });
           }
@@ -111,6 +143,17 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           await db.user.update({
             where: { email },
             data: { roleId: superAdminRole.id },
+          });
+        } else if (!isBootstrapAdmin && !existingUser.roleId) {
+          // Safety net for legacy users without role: assign basic staff role
+          console.log("[Auth] Assigning basic staff role to existing user without role", {
+            email,
+            roleId: basicStaffRole.id,
+          });
+
+          await db.user.update({
+            where: { email },
+            data: { roleId: basicStaffRole.id },
           });
         } else {
           console.log("[Auth] Existing user login", {
@@ -167,7 +210,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             }
 
             // 5) ADMIN OVERRIDE (The "User One" Safety Net)
-            const defaultAdminEmail = (process.env.DEFAULT_ADMIN_EMAIL || "").toLowerCase();
+            const defaultAdminEmail =
+              (process.env.DEFAULT_ADMIN_EMAIL || "").toLowerCase();
             if (email === defaultAdminEmail) {
               session.user.permissions = Object.values(PERMISSIONS);
               session.user.isGlobal = true;
