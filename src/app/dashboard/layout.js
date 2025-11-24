@@ -126,11 +126,13 @@ export default async function DashboardLayout({ children }) {
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col">
-      <DashboardHeader
-        user={session.user}
-        unreadCount={unreadCount}
-        notifications={headerNotifications}
-      />
+      <div className="relative z-40">
+        <DashboardHeader
+          user={session.user}
+          unreadCount={unreadCount}
+          notifications={headerNotifications}
+        />
+      </div>
       <main className="flex-1 container mx-auto max-w-7xl p-4 md:p-6">
         {children}
       </main>
