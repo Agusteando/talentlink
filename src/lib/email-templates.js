@@ -1,4 +1,3 @@
-
 export function generateEmailTemplate(type, data = {}) {
   const {
     candidateName,
@@ -17,11 +16,14 @@ export function generateEmailTemplate(type, data = {}) {
 
   const primaryColor = "#0f172a"; // Slate 900
   const fontFamily = "'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
+  
+  // Construct absolute URL for the logo
+  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "https://casitaiedis.edu.mx";
+  const logoUrl = `${baseUrl}/TalentLink.png`;
 
   const header = `
       <div style="background-color: ${primaryColor}; padding: 25px; text-align: center;">
-          <h1 style="color: white; margin: 0; font-family: ${fontFamily}; font-size: 22px; letter-spacing: 1px;">TalentLink</h1>
-          <p style="color: #94a3b8; margin: 5px 0 0; font-family: ${fontFamily}; font-size: 12px; text-transform: uppercase;">IECS - IEDIS</p>
+          <img src="${logoUrl}" alt="TalentLink" style="height: 40px; width: auto; display: block; margin: 0 auto;" />
       </div>
     `;
 
@@ -140,10 +142,6 @@ export function generateEmailTemplate(type, data = {}) {
                 : ""
             }
           </div>
-
-          <p style="font-size:12px; color:#6b7280; margin-top:4px;">
-            Si no deseas recibir este tipo de correos, actualiza tus preferencias en TalentLink &gt; Configuración &gt; Notificaciones personales.
-          </p>
         `;
       break;
 
